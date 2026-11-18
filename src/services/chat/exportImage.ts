@@ -71,7 +71,7 @@ const safeImageName = (title: string, id: string) => {
     .slice(0, 80)
     .join('')
   const fallback = `chat-${id.replace(/[\\/:*?"<>|]/g, '_')}`
-  const base = cleaned || fallback
+  const base = (cleaned || fallback).replace(/\.png$/i, '') || fallback
   // CON、NUL、COM1 等名称在 Windows 上即使带扩展名也不能作为文件名。
   const reserved = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(\..*)?$/i.test(base)
   return `${reserved ? `${base}-chat` : base}.png`
@@ -79,7 +79,10 @@ const safeImageName = (title: string, id: string) => {
 
 const resolveSession = async (sessionId: string): Promise<Session | undefined> => {
   // 正在编辑/流式生成的会话以内存版本为准；临时会话也只存在内存中。
-  const cached = useChatStore.getState().sessionCache[sessionId]
+  const state = useChatStore.getState()
+  const cached = Object.hasOwn(state.sessionCache, sessionId)
+    ? state.sessionCache[sessionId]
+    : undefined
   return cached ?? (await loadSession(sessionId))
 }
 
@@ -259,6 +262,12 @@ const codeBlockElement = async (
       const diagram = document.createElement('div')
       diagram.className = 'md-mermaid-diagram'
       diagram.innerHTML = svg
+      const diagramSvg = diagram.querySelector('svg')
+      if (diagramSvg) {
+        // Mermaid 会写死 max-width；导出时统一限制在内容宽度内。
+        diagramSvg.style.maxWidth = '100%'
+        diagramSvg.style.height = 'auto'
+      }
       block.appendChild(diagram)
       return block
     }
@@ -707,32 +716,42 @@ const inlineFontFaces = async (entry: StyleEntry): Promise<string> => {
     return entry.text
   }
   const faces = entry.text.match(/@font-face\s*\{[^}]*\}/g) ?? []
+  // 并行读取，单个字体失败/超时不会把整次导出拖成串行等待。
+  const replacements = await Promise.all(
+    faces.map(async (face) => {
+      const urls = Array.from(face.matchAll(/url\(\s*(['"]?)([^'")]+)\1\s*\)/g))
+        .map((match) => match[2])
+        .filter((url): url is string => Boolean(url))
+      const woff2 = urls.find((url) => url.split('?')[0].endsWith('.woff2'))
+      const source = woff2 ?? urls[0]
+      if (!source || source.startsWith('data:')) {
+        return null
+      }
+      let absolute: string
+      try {
+        absolute = new URL(source, entry.base).href
+      } catch {
+        return null
+      }
+      const data = await fetchFontData(absolute)
+      if (!data) {
+        return null
+      }
+      const format = woff2 ? 'woff2' : ''
+      return {
+        face,
+        replaced: face.replace(
+          /src:[^}]*/,
+          `src:url("${data}")${format ? ` format("${format}")` : ''}`
+        ),
+      }
+    })
+  )
   let text = entry.text
-  for (const face of faces) {
-    const urls = Array.from(face.matchAll(/url\(\s*(['"]?)([^'")]+)\1\s*\)/g))
-      .map((match) => match[2])
-      .filter((url): url is string => Boolean(url))
-    const woff2 = urls.find((url) => url.split('?')[0].endsWith('.woff2'))
-    const source = woff2 ?? urls[0]
-    if (!source || source.startsWith('data:')) {
-      continue
+  for (const replacement of replacements) {
+    if (replacement) {
+      text = text.replace(replacement.face, replacement.replaced)
     }
-    let absolute: string
-    try {
-      absolute = new URL(source, entry.base).href
-    } catch {
-      continue
-    }
-    const data = await fetchFontData(absolute)
-    if (!data) {
-      continue
-    }
-    const format = woff2 ? 'woff2' : ''
-    const replaced = face.replace(
-      /src:[^}]*/,
-      `src:url("${data}")${format ? ` format("${format}")` : ''}`
-    )
-    text = text.replace(face, replaced)
   }
   return text
 }
@@ -1348,23 +1367,39 @@ const createCssBundle = async (
 
 const nextFrame = () =>
   new Promise<void>((resolve) => {
+    let settled = false
+    const finish = () => {
+      if (!settled) {
+        settled = true
+        clearTimeout(timer)
+        resolve()
+      }
+    }
+    // 窗口最小化/隐藏时 rAF 可能暂停，用定时器保证导出不会挂起。
+    const timer = setTimeout(finish, 250)
     if (typeof requestAnimationFrame === 'function') {
-      requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+      requestAnimationFrame(() => requestAnimationFrame(finish))
     } else {
-      setTimeout(resolve, 0)
+      finish()
     }
   })
 
 const canvasToBlob = (canvas: HTMLCanvasElement): Promise<Blob> =>
   new Promise((resolve, reject) => {
     if (typeof canvas.toBlob === 'function') {
-      canvas.toBlob((blob) => {
-        if (blob) {
-          resolve(blob)
-        } else {
-          reject(new ExportImageError('RASTERIZE_FAILED', 'Canvas produced an empty PNG.'))
-        }
-      }, 'image/png')
+      try {
+        canvas.toBlob((blob) => {
+          if (blob) {
+            resolve(blob)
+          } else {
+            reject(new ExportImageError('RASTERIZE_FAILED', 'Canvas produced an empty PNG.'))
+          }
+        }, 'image/png')
+      } catch (error) {
+        reject(
+          new ExportImageError('RASTERIZE_FAILED', 'Failed to encode the rendered image.', error)
+        )
+      }
       return
     }
     try {
@@ -1412,14 +1447,22 @@ const rasterize = async (
   const image = new Image()
   image.decoding = 'sync'
   const loaded = new Promise<void>((resolve, reject) => {
-    image.onload = () => resolve()
-    image.onerror = () =>
+    const timer = setTimeout(() => {
+      reject(new ExportImageError('RASTERIZE_FAILED', 'Timed out while rasterizing the image.'))
+    }, 20_000)
+    image.onload = () => {
+      clearTimeout(timer)
+      resolve()
+    }
+    image.onerror = () => {
+      clearTimeout(timer)
       reject(
         new ExportImageError(
           'RASTERIZE_FAILED',
           'The browser could not rasterize the session image.'
         )
       )
+    }
   })
   image.src = dataUrl
   await loaded
