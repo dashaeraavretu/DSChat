@@ -30,6 +30,7 @@ import {
   setNotifyOnComplete,
   setReadingWidth,
   setSendKey,
+  setShowInputCount,
   setShowMascot,
   setThemePreference,
   setTtsSpeed,
@@ -147,6 +148,7 @@ const SettingsContent = () => {
               <ZoomSetting />
               <AppearanceSetting />
               <MascotSetting />
+              <InputCountSetting />
               <ReadingWidthSetting />
               <TtsSpeedSetting />
               <SendKeySetting />
@@ -674,6 +676,29 @@ const MascotSetting = () => {
   )
 }
 
+const InputCountSetting = () => {
+  const t = useTranslate()
+  const showInputCount = useSettings((state) => state.showInputCount)
+  return (
+    <SettingCell
+      label={t('settingsInputCount')}
+      status={null}
+      action={
+        <button
+          type="button"
+          role="switch"
+          aria-checked={showInputCount}
+          aria-label={t('settingsInputCount')}
+          className={clsx(styles.switch, showInputCount && styles.switchOn)}
+          onClick={() => setShowInputCount(!showInputCount)}
+        >
+          <span className={styles.switchThumb} />
+        </button>
+      }
+    />
+  )
+}
+
 const ReadingWidthSetting = () => {
   const t = useTranslate()
   const readingWidth = useSettings((state) => state.readingWidth)
@@ -826,7 +851,7 @@ const AboutDialog = ({ onClose }: { onClose: () => void }) => {
       ) : null}
       <div className={styles.aboutDescription}>{t('diagnosticsDescription')}</div>
       <div className={styles.aboutDescription}>
-        {t('thirdPartyLicenses')}: React, Zustand, KaTeX, Mermaid, Prism, idb, fflate ·
+        {t('thirdPartyLicenses')}: React, Zustand, KaTeX, Mermaid, Prism, idb, fflate, Twemoji (CC-BY 4.0) ·
         THIRD_PARTY_NOTICES.md
       </div>
     </Modal>

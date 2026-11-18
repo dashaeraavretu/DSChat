@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { translate } from '../../i18n/index.js'
 import { createId } from '../../utils/id.js'
 import { getDefaultPreset, snapshotPreset } from '../presets.js'
+import { ORIGINAL_SYSTEM_PROMPT, renderPrompt } from '../promptVariables.js'
 import { ApiError, streamMessage } from '../api/client.js'
 import { API_MODEL, FEATURES } from '../buildInfo.js'
 import type { ChatModel, CreateMessageRequest } from '../api/types.js'
@@ -38,7 +39,7 @@ import {
 /** 构建期模型；默认 deepseek-flash，测试 provider 可覆盖 */
 const MODEL: ChatModel = API_MODEL
 /** 所有生成请求统一携带的助手身份说明 */
-const SYSTEM_PROMPT = '该助手为DeepSeek，由深度求索公司创造。'
+const SYSTEM_PROMPT = ORIGINAL_SYSTEM_PROMPT
 /** 保留最近打开的详情；当前会话、生成中及尚未成功保存的会话不淘汰。 */
 const SESSION_CACHE_LIMIT = 5
 /** 安全审核固定开启，所有请求都走扩展模式 */
@@ -1123,7 +1124,12 @@ const streamReply = async (sessionId: string, initial: AssistantMessage, request
           useSettings.getState().apiKey ?? '',
           {
             model: initial.model ?? MODEL,
-            system: getSession(sessionId)?.preset?.system?.trim() || SYSTEM_PROMPT,
+            system: (() => {
+              const preset = getSession(sessionId)?.preset
+              return preset?.system
+                ? renderPrompt(preset.system, { char: preset.name, original: SYSTEM_PROMPT })
+                : SYSTEM_PROMPT
+            })(),
             messages,
             thinking: { type: initial.thinking ? 'enabled' : 'disabled' },
             safety_check: SAFETY_CHECK,

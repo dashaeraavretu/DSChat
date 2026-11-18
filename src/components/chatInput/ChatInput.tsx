@@ -55,6 +55,9 @@ const Input = ({ sessionId }: { sessionId: string | null }) => {
   const isMobile = useIsMobile()
   const search = useSettings((state) => state.search)
   const sendKey = useSettings((state) => state.sendKey)
+  const showInputCount = useSettings((state) => state.showInputCount)
+  const historyRef = useRef<string[]>([])
+  const historyIndexRef = useRef(-1)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const togglesRef = useRef<HTMLDivElement>(null)
@@ -156,7 +159,16 @@ const Input = ({ sessionId }: { sessionId: string | null }) => {
       return
     }
     // 文本与上传完成态由提交动作读取最新快照，不使用上一次渲染的草稿。
-    if (!ensureApiKey() || !sendMessage(sessionId)) {
+    if (ensureApiKey() && sendMessage(sessionId)) {
+      const sent = getDraft(sessionId).text.trim()
+      if (sent && historyRef.current.at(-1) !== sent) {
+        historyRef.current.push(sent)
+        if (historyRef.current.length > 100) {
+          historyRef.current.shift()
+        }
+      }
+      historyIndexRef.current = -1
+    } else {
       return
     }
     stopReadAloud()
@@ -187,7 +199,10 @@ const Input = ({ sessionId }: { sessionId: string | null }) => {
           autoFocus={!isMobile}
           disabled={importingHistory}
           value={text}
-          onChange={(event) => setText(event.target.value)}
+          onChange={(event) => {
+            historyIndexRef.current = -1
+            setText(event.target.value)
+          }}
           onMouseDown={(event) => {
             // 首次点击时手动聚焦，避免 Safari 把整个页面滚到输入框位置。
             if (isMobile && event.button === 0 && document.activeElement !== event.currentTarget) {
@@ -263,6 +278,9 @@ const Input = ({ sessionId }: { sessionId: string | null }) => {
           </Tooltip>
         </div>
         <div className={styles.right}>
+          {showInputCount && text.length > 0 ? (
+            <span className={styles.count}>{t('inputCharCount', { count: text.length })}</span>
+          ) : null}
           <VoiceButton
             status={voice.status}
             disabled={!voice.available}

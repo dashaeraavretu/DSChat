@@ -49,6 +49,7 @@ type Settings = {
   sendKey: SendKey
   appearance: Appearance
   showMascot: boolean
+  showInputCount: boolean
 }
 
 const KEYS = {
@@ -67,6 +68,7 @@ const KEYS = {
   sendKey: 'chat-demo:send-key',
   appearance: 'chat-demo:appearance',
   showMascot: 'chat-demo:show-mascot',
+  showInputCount: 'chat-demo:show-input-count',
 } as const
 
 /** Electron preload 注入的桌面桥接；纯网页环境返回 undefined */
@@ -187,6 +189,7 @@ export const useSettings = create<Settings>(() => ({
     return value === 'tui' || value === 'fish' || value === 'paper' ? value : 'original'
   })(),
   showMascot: read(KEYS.showMascot) !== 'false',
+  showInputCount: read(KEYS.showInputCount) !== 'false',
 }))
 
 export const setLocale = (locale: Locale) => {
@@ -370,6 +373,11 @@ export const setAppearance = (appearance: Appearance) => {
 export const setShowMascot = (showMascot: boolean) => {
   write(KEYS.showMascot, String(showMascot))
   useSettings.setState({ showMascot })
+}
+
+export const setShowInputCount = (showInputCount: boolean) => {
+  write(KEYS.showInputCount, String(showInputCount))
+  useSettings.setState({ showInputCount })
 }
 
 export const setNotifyOnComplete = (notifyOnComplete: boolean) => {

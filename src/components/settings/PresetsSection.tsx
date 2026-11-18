@@ -17,6 +17,7 @@ import {
 import { Button } from '../base/Button.js'
 import { Modal } from '../base/Modal.js'
 import { showToast } from '../base/toastState.js'
+import { ORIGINAL_SYSTEM_PROMPT, renderPrompt } from '../../services/promptVariables.js'
 import styles from './Settings.module.css'
 
 type Draft = { id?: string; name: string; system: string; greeting: string }
@@ -229,6 +230,19 @@ export const PresetsSection = () => {
                 onChange={(event) => setDraft({ ...draft, greeting: event.target.value })}
               />
             </label>
+            <div className={styles.presetVariables}>{t('presetVariablesHint')}</div>
+            <div className={styles.presetPreview}>
+              <div className={styles.presetFieldLabel}>{t('presetPreview')}</div>
+              {draft.system.trim() ? (
+                <pre>{renderPrompt(draft.system, {
+                  char: draft.name || 'Assistant',
+                  original: ORIGINAL_SYSTEM_PROMPT,
+                })}</pre>
+              ) : null}
+              {draft.greeting.trim() ? (
+                <pre>{renderPrompt(draft.greeting, { char: draft.name || 'Assistant' })}</pre>
+              ) : null}
+            </div>
           </div>
         </Modal>
       ) : null}

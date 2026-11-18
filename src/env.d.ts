@@ -68,3 +68,9 @@ declare module 'prismjs/components/*' {}
 
 /** KaTeX 化学公式扩展通过副作用注册到 KaTeX */
 declare module 'katex/contrib/mhchem' {}
+
+/** 装饰 SVG 作为资源 URL 导入 */
+declare module '*.svg' {
+  const src: string
+  export default src
+}

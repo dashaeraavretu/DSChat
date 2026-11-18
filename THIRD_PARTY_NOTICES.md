@@ -22,5 +22,8 @@ The appearance presets and the original fat-fish mascot are original artwork
 created for this project. No DeepSeek official or community mascot artwork is
 bundled, and the "big fat fish" community name is not used.
 
-Open-source decoration assets, when added in later builds, must be recorded
-here with their license and attribution before release.
+## Decorations
+
+Empty/error/loading illustrations use Twemoji SVG graphics
+(https://github.com/jdecked/twemoji), Copyright Twitter, Inc. and contributors,
+licensed under CC-BY 4.0. The SVG files are used unmodified as UI decorations.

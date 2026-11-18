@@ -9,6 +9,7 @@ import { stopReadAloud } from '../../services/speech/readAloud.js'
 import type { AssistantMessage as AssistantMessageType } from '../../services/chat/types.js'
 import { openSettings } from '../settings/settingsDialogState.js'
 import { useSettings } from '../../services/settings.js'
+import { PresetDecoration } from '../session/PresetDecoration.js'
 import { IconButton } from '../base/IconButton.js'
 import { Button } from '../base/Button.js'
 import { Markdown } from '../markdown/Markdown.js'
@@ -46,6 +47,8 @@ export const AssistantMessage = memo(function AssistantMessage({
 }) {
   const t = useTranslate()
   const locale = useSettings((state) => state.locale)
+  const appearance = useSettings((state) => state.appearance)
+  const decorated = appearance !== 'original'
   const view = useReplyView(message, streaming)
   const panelEntry = useSearchPanel((state) => state.entry)
   const notice = streaming ? null : describeReply(message)
@@ -94,6 +97,7 @@ export const AssistantMessage = memo(function AssistantMessage({
       ) : null}
       {waiting ? (
         <div className={styles.waiting}>
+          {decorated ? <PresetDecoration kind="loading" /> : null}
           {[0, 1, 2].map((index) => (
             <span key={index} className={styles.waitingDot} />
           ))}
@@ -109,7 +113,7 @@ export const AssistantMessage = memo(function AssistantMessage({
         />
       ) : notice ? (
         <div className={styles.notice}>
-          <IconWarningOutline16 />
+          {decorated ? <PresetDecoration kind="error" /> : <IconWarningOutline16 />}
           <span>
             {notice.text}
             {notice.action === 'apiKey' ? (

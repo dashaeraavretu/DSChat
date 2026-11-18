@@ -726,3 +726,31 @@
   overflow-x: hidden;
   scrollbar-color: var(--scroll-color) transparent;
 }
+
+.presetVariables {
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.presetPreview {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px;
+  border: 1px solid var(--dsw-alias-border-l1);
+  border-radius: var(--ds-radius-10);
+  background-color: var(--dsw-alias-bg-layer-3);
+}
+
+.presetPreview pre {
+  margin: 0;
+  max-height: 120px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--dsw-alias-label-secondary);
+  font-family: var(--ds-font-family-code);
+  font-size: 12px;
+  line-height: 18px;
+}

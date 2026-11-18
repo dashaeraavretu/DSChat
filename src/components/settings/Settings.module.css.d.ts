@@ -61,6 +61,8 @@ declare const styles: {
   readonly "presetFieldLabel": string;
   readonly "presetInput": string;
   readonly "presetTextarea": string;
+  readonly "presetVariables": string;
+  readonly "presetPreview": string;
   readonly "presetEditor": string;
   readonly "presetEditorMain": string;
 };

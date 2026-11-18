@@ -4,7 +4,9 @@ import { ChatInput } from '../chatInput/ChatInput.js'
 import { useChatStore } from '../../services/chat/store.js'
 import { usePresets } from '../../services/presets.js'
 import { useSettings } from '../../services/settings.js'
+import { renderPrompt } from '../../services/promptVariables.js'
 import { FatFishMascot } from './FatFishMascot.js'
+import { PresetDecoration } from './PresetDecoration.js'
 import { MobileHeader } from './MobileHeader.js'
 import styles from './Welcome.module.css'
 
@@ -23,10 +25,15 @@ export const Welcome = () => {
       {isMobile ? <MobileHeader /> : null}
       <div className={styles.welcome}>
         {appearance === 'fish' && showMascot ? <FatFishMascot /> : null}
+        {appearance === 'tui' || appearance === 'paper' ? (
+          <PresetDecoration kind="empty" size="empty" />
+        ) : null}
         {ephemeral ? <div className={styles.ephemeralBadge}>{t('ephemeralBadge')}</div> : null}
         <div className={styles.greeting}>{t('welcomeMessageChat250808')}</div>
         {preset?.greeting ? (
-          <div className={styles.presetGreeting}>{preset.greeting}</div>
+          <div className={styles.presetGreeting}>
+            {renderPrompt(preset.greeting, { char: preset.name })}
+          </div>
         ) : null}
         <ChatInput sessionId={null} />
         {isMobile ? <div className={styles.caveat}>{t('contentCaveat')}</div> : null}

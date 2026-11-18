@@ -330,3 +330,11 @@
     cursor: not-allowed;
   }
 }
+
+.count {
+  margin-right: 6px;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 11px;
+  line-height: 20px;
+  white-space: nowrap;
+}
