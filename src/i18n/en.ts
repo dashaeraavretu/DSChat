@@ -107,12 +107,24 @@ export const en = {
   apiKeyEdit: 'Edit API Key',
   apiKeyDesktopStorageHint:
     'Stored only on this device and encrypted by the operating system. It is never uploaded to a server.',
+  apiKeyDesktopPlaintextHint:
+    'System encryption is unavailable. The API Key is stored unencrypted on this device (degraded).',
+  apiKeyDesktopFallbackHint:
+    'System encryption failed. The API Key is stored unencrypted in browser local storage (degraded).',
   apiKeyWebStorageHint: "The API Key is saved in your browser's local storage.",
   apiKeyPlaceholder: 'Enter API Key',
   apiKeyVerifying: 'Verifying...',
   confirm: 'Confirm',
   apiKeyInvalid: 'Invalid API Key. Please check it and try again.',
   apiKeyVerificationFailed: 'Verification failed: {message}',
+  apiKeyClear: 'Clear API Key',
+  apiKeyClearTitle: 'Clear API Key?',
+  apiKeyClearDescription:
+    'The API Key will be removed from this device and browser storage. You will need to enter it again to continue. Chats and attachments are not affected.',
+  apiKeyClearConfirm: 'Clear',
+  apiKeyClearing: 'Clearing...',
+  apiKeyCleared: 'API Key cleared',
+  apiKeyClearFailed: 'Failed to clear the API Key. Please try again.',
   historyImport: 'Import chat history',
   historyImportConfirm: 'Import',
   historyImportConfirmTitle: 'Import chat history?',

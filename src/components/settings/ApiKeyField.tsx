@@ -1,3 +1,4 @@
+import clsx from 'clsx'
 import { useState } from 'react'
 import { IconEditOutline16 } from '../base/icons.js'
 import { isDesktopApp, useSettings } from '../../services/settings.js'
@@ -22,13 +23,23 @@ export const ApiKeyField = ({ editor }: { editor: ApiKeyEditor }) => {
   const t = useTranslate()
   const isMobile = useIsMobile()
   const { apiKey, editing, setEditing, form, showInput } = editor
+  const desktop = isDesktopApp()
+  const apiKeyStorage = useSettings((state) => state.apiKeyStorage)
+  const degraded = desktop && apiKeyStorage !== 'encrypted'
+  const storageHint = !desktop
+    ? 'apiKeyWebStorageHint'
+    : apiKeyStorage === 'encrypted'
+      ? 'apiKeyDesktopStorageHint'
+      : apiKeyStorage === 'localStorage'
+        ? 'apiKeyDesktopFallbackHint'
+        : 'apiKeyDesktopPlaintextHint'
 
   return (
     <div className={styles.cell}>
       <div className={styles.apiKey}>
         <div className={styles.label}>{t('apiKeyStart')}</div>
-        <div className={styles.description}>
-          {t(isDesktopApp() ? 'apiKeyDesktopStorageHint' : 'apiKeyWebStorageHint')}
+        <div className={clsx(styles.description, degraded && styles.error)}>
+          {degraded ? `⚠ ${t(storageHint)}` : t(storageHint)}
         </div>
         {apiKey && !editing ? (
           <div className={styles.apiKeySaved}>

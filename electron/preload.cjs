@@ -4,6 +4,27 @@ const { contextBridge, ipcRenderer } = require('electron')
 
 let apiKey = null
 let version = ''
+let keyStorage = { encryptionAvailable: false, mode: 'plaintext' }
+
+const normalizeKeyStorage = (value) => {
+  if (!value || typeof value !== 'object') return null
+  if (value.mode !== 'encrypted' && value.mode !== 'plaintext') return null
+  return { encryptionAvailable: value.encryptionAvailable === true, mode: value.mode }
+}
+
+const readKeyStorage = () => {
+  try {
+    return (
+      normalizeKeyStorage(ipcRenderer.sendSync('settings:get-key-storage')) ?? {
+        encryptionAvailable: false,
+        mode: 'plaintext',
+      }
+    )
+  } catch (error) {
+    console.error('[preload] 读取密钥存储状态失败：', error)
+    return { encryptionAvailable: false, mode: 'plaintext' }
+  }
+}
 
 try {
   const stored = ipcRenderer.sendSync('settings:get-api-key')
@@ -19,9 +40,12 @@ try {
   console.error('[preload] 读取版本号失败：', error)
 }
 
+keyStorage = readKeyStorage()
+
 contextBridge.exposeInMainWorld('desktop', {
   isDesktop: true,
   apiKey,
+  keyStorage,
   async setApiKey(key) {
     if (key !== null && typeof key !== 'string') return false
     try {
@@ -33,6 +57,19 @@ contextBridge.exposeInMainWorld('desktop', {
     } catch (error) {
       console.error('[preload] 保存 API Key 失败：', error)
       return false
+    }
+  },
+  async getKeyStorage() {
+    try {
+      return (
+        normalizeKeyStorage(await ipcRenderer.invoke('settings:get-key-storage')) ?? {
+          encryptionAvailable: false,
+          mode: 'plaintext',
+        }
+      )
+    } catch (error) {
+      console.error('[preload] 刷新密钥存储状态失败：', error)
+      return { encryptionAvailable: false, mode: 'plaintext' }
     }
   },
   version,

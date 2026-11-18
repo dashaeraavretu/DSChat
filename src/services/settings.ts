@@ -8,11 +8,21 @@ export type Locale = 'zh-CN' | 'en-US'
 export type ThemePreference = 'light' | 'dark' | 'system'
 
 /**
+ * API Key 的实际保存方式：
+ * - encrypted：主进程确认使用系统加密
+ * - plaintext：主进程确认系统加密不可用或存档为明文（降级）
+ * - localStorage：主进程保存失败，渲染层回退到浏览器本地存储（未加密，降级）
+ * - web：纯网页版
+ */
+export type ApiKeyStorage = 'encrypted' | 'plaintext' | 'localStorage' | 'web'
+
+/**
  * 本机设置，存 localStorage：语言、主题、位置、朗读音色、深度思考与智能搜索开关、侧边栏收起状态。
  * API Key 在桌面端由系统加密存储（见 window.desktop），网页端仍存 localStorage。
  */
 type Settings = {
   apiKey: string | null
+  apiKeyStorage: ApiKeyStorage
   locale: Locale
   themePreference: ThemePreference
   location: UserLocation | null
@@ -106,13 +116,28 @@ const initialTtsVoice = (): TtsVoice => (read(KEYS.ttsVoice) === 'tide' ? 'tide'
 const initialApiKey = (): string | null => {
   const bridge = desktopBridge()
   if (bridge) {
-    return typeof bridge.apiKey === 'string' ? bridge.apiKey : null
+    // 主进程不可用时的 localStorage 降级键仍可用于本次会话，避免每次重启都丢失
+    return typeof bridge.apiKey === 'string' ? bridge.apiKey : read(KEYS.apiKey)
   }
   return read(KEYS.apiKey)
 }
 
+/** 桌面端以主进程报告的状态为准；缺少状态时按未加密处理，避免谎称已加密 */
+const initialApiKeyStorage = (): ApiKeyStorage => {
+  const bridge = desktopBridge()
+  if (!bridge) {
+    return 'web'
+  }
+  // localStorage 里还留着降级键时，必须先如实显示“未加密”，不能等迁移后才纠正
+  if (!bridge.apiKey && read(KEYS.apiKey)) {
+    return 'localStorage'
+  }
+  return bridge.keyStorage?.mode === 'encrypted' ? 'encrypted' : 'plaintext'
+}
+
 export const useSettings = create<Settings>(() => ({
   apiKey: initialApiKey(),
+  apiKeyStorage: initialApiKeyStorage(),
   locale: initialLocale(),
   location: initialLocation(),
   themePreference: initialThemePreference(),
@@ -143,21 +168,47 @@ export const setTtsVoice = (ttsVoice: TtsVoice) => {
   useSettings.setState({ ttsVoice })
 }
 
+const setApiKeyStorage = (apiKeyStorage: ApiKeyStorage) =>
+  useSettings.setState({ apiKeyStorage })
+
+/** 主进程保存失败时的降级路径：写入 localStorage，并在设置页如实标记未加密 */
+const fallbackToLocalStorage = (apiKey: string | null, reason: unknown) => {
+  // eslint-disable-next-line no-console
+  console.warn('[settings] 系统加密存储不可用，API Key 已回退保存到 localStorage（未加密）', reason)
+  write(KEYS.apiKey, apiKey)
+  setApiKeyStorage('localStorage')
+}
+
+/** 重新向主进程查询实际存储方式；只在保存成功后调用，避免覆盖 localStorage 降级状态 */
+export const refreshApiKeyStorage = async (): Promise<void> => {
+  const bridge = desktopBridge()
+  if (!bridge || typeof bridge.getKeyStorage !== 'function') {
+    return
+  }
+  try {
+    const status = await bridge.getKeyStorage()
+    setApiKeyStorage(status.mode === 'encrypted' ? 'encrypted' : 'plaintext')
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.warn('[settings] 查询密钥存储状态失败，按未加密展示', error)
+    setApiKeyStorage('plaintext')
+  }
+}
+
 /**
- * 桌面端异步保存：由系统加密存储；返回 false 表示加密不可用，
- * 此时回退到 localStorage 保证本次可用，并保留警告便于排查。
+ * 桌面端异步保存：主进程返回 false（无法持久化）或 IPC 异常时，
+ * 回退 localStorage 并标记为未加密降级；成功则刷新主进程给出的状态。
  */
 const saveDesktopApiKey = async (bridge: DesktopBridge, apiKey: string | null) => {
   try {
     const saved = await bridge.setApiKey(apiKey)
     if (!saved) {
-      // eslint-disable-next-line no-console
-      console.warn('[settings] 桌面端系统加密存储不可用，API Key 已回退保存到 localStorage')
-      write(KEYS.apiKey, apiKey)
+      fallbackToLocalStorage(apiKey, '主进程保存失败')
+      return
     }
+    await refreshApiKeyStorage()
   } catch (error) {
-    // eslint-disable-next-line no-console
-    console.warn('[settings] 桌面端保存 API Key 失败', error)
+    fallbackToLocalStorage(apiKey, error)
   }
 }
 
@@ -171,6 +222,33 @@ export const setApiKey = (apiKey: string | null) => {
     // 桌面端不在这里写明文，等加密存储的结果
     void saveDesktopApiKey(bridge, apiKey)
   }
+}
+
+/**
+ * 清除 API Key：桌面端删除 secrets.json 并清空主进程内存，同时清理网页版遗留的
+ * localStorage 键；保存失败时不做任何“已清除”的假象，返回 false 交给界面提示。
+ */
+export const clearApiKey = async (): Promise<boolean> => {
+  const bridge = desktopBridge()
+  if (bridge) {
+    try {
+      if (!(await bridge.setApiKey(null))) {
+        return false
+      }
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.warn('[settings] 清除 API Key 失败', error)
+      return false
+    }
+  }
+  write(KEYS.apiKey, null)
+  useSettings.setState({ apiKey: null })
+  if (bridge) {
+    await refreshApiKeyStorage()
+  } else {
+    setApiKeyStorage('web')
+  }
+  return true
 }
 
 /**
@@ -196,6 +274,7 @@ export const migrateLegacyApiKey = async (): Promise<void> => {
     if (!saved) {
       // eslint-disable-next-line no-console
       console.warn('[settings] 系统加密存储不可用，网页版遗留的 API Key 暂时保留在 localStorage')
+      setApiKeyStorage('localStorage')
       return
     }
     write(KEYS.apiKey, null)
@@ -203,9 +282,11 @@ export const migrateLegacyApiKey = async (): Promise<void> => {
     if (!useSettings.getState().apiKey) {
       useSettings.setState({ apiKey: legacy })
     }
+    await refreshApiKeyStorage()
   } catch (error) {
     // eslint-disable-next-line no-console
     console.warn('[settings] 迁移网页版 API Key 失败，保留 localStorage 旧键', error)
+    setApiKeyStorage('localStorage')
   }
 }
 

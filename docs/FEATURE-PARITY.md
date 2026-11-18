@@ -558,7 +558,7 @@
 - 使用 `dsc://app` 自定义协议加载 `dist/`：`standard`、`secure`、支持 fetch/CORS/stream，使 IndexedDB、localStorage、WebCrypto、getUserMedia 正常工作。
 - 开发模式 `DSCHAT_DEV=1` 加载 `http://localhost:8090`。
 - `contextIsolation: true`、`sandbox: true`、`nodeIntegration: false`；preload 只暴露白名单桥接。
-- 外部链接通过系统浏览器打开；应用内禁止任意外部导航和 `<webview>`。附件/图片原件的同源 `blob:` 预览使用受控只读子窗口。
+- 外部链接通过系统浏览器打开；应用内禁止任意外部导航和 `<webview>`。附件/图片原件的同源 `blob:` 预览使用受控只读子窗口；`data:` URL 不放行（主进程仅匹配 `blob:`）。
 - 只放行受信任页面的音频权限，拒绝摄像头。
 - 单实例锁；生产包禁用 DevTools；窗口最小尺寸 900×620；应用标题 DSChat。
 - 支持 `--smoke` 启动检查。
@@ -568,7 +568,7 @@
 1. 打包版启动后检查地址为 `dsc://app/index.html`，存储、麦克风、图表均正常。
 2. 在控制台确认 `require` / `process` 不可用。
 3. 点击正文链接和来源链接，确认系统浏览器打开。
-4. 尝试打开 http(s) 外部链接，确认交给系统浏览器；确认 blob: 附件预览可用、`javascript:` URL 被拒绝。
+4. 尝试打开 http(s) 外部链接，确认交给系统浏览器；确认同源 `blob:` 附件预览可用，`data:` 与 `javascript:` URL 被拒绝。
 5. 请求摄像头权限，确认被拒绝；请求麦克风在受信任页面可用。
 6. 启动第二个实例，确认聚焦已有窗口。
 7. 生产包确认 DevTools 不可用。
@@ -582,8 +582,8 @@
 1. **服务端扩展依赖**：智能搜索、链接阅读、ASR/TTS、安全过滤、自动标题、继续生成、`latest_reminder` 均需 DeepSeek 官方或兼容服务支持。仅替换普通 OpenAI 风格接口不足以实现这些功能。
 2. **`document` 块兼容性**：应用始终开启扩展模式（`safety_check: high`、`deepseek_read_url`），而类型注释指出扩展模式可能不支持非图片 `document` 块并返回 400。PDF/Office/文本附件必须在目标服务上单独验收。
 3. **`dsc://app` CORS 风险**：渲染层从自定义协议源直接请求 API，没有主进程代理。若服务端只允许网页源或不允许 `dsc://app`，打包版请求会失败。上线前必须验证；必要时补主进程代理。
-4. **本地附件打开（v1 已处理）**：已发送的附件/图片原件通过 `window.open(blob:…)` 打开；主进程现仅对同源 `blob:` 放行受控只读子窗口，`http/https` 仍交给系统浏览器。`pnpm smoke:blob` 覆盖该路径，打包版实测通过。
-5. **密钥生命周期**：设置界面没有“清除 Key”按钮，也没有启动时校验；`safeStorage` 不可用时明文落盘，IPC 失败时可能回退 localStorage，而界面提示仍声称加密存储。发布说明应披露降级路径。
+4. **本地附件打开（v1 已处理）**：已发送的附件/图片原件通过 `window.open(blob:…)` 打开；主进程仅对 `blob:` 放行受控只读子窗口，`data:` 不放行，`http/https` 仍交给系统浏览器。`pnpm smoke:blob` 覆盖该路径，打包版实测通过。
+5. **密钥生命周期**：设置页已提供“清除 API Key”（确认后删除 `secrets.json`、主进程内存与旧 localStorage 键）；仍没有启动时校验。`safeStorage` 不可用或回退 localStorage 时，设置页按主进程状态显示“未加密/降级”，不再声称已加密；发布说明仍应披露降级路径。
 6. **网页版与桌面版数据不互通**：`localhost:8090`、`dsc://app` 和 `file://` 是不同存储源，会话/附件不会自动迁移；只有 API Key 有迁移逻辑。历史需通过 ZIP 导入导出。
 7. **远端文件生命周期**：`deleteFile` 从未调用；删除会话、移除附件或删除全部对话都不会删除已上传到 API 服务的文件，可能累积占用配额，且删除确认文案与实际行为不一致。
 8. **历史与流式提示的边界**：只支持版本 3、ZIP32、STORE/DEFLATE、非加密单卷；导入后引用、模型、思考签名、结构化错误、`latestReminder` 等不保留，回复不能继续。导入失败界面统一显示通用错误，不区分具体原因；空消息的流中断错误可能没有可见提示。

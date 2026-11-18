@@ -8,13 +8,23 @@ declare module '*.css' {}
 /** 公开 API 的地址，见 rspack.config.ts 的 createConfig */
 declare const __API_ORIGIN__: string
 
+/** 主进程报告的密钥存储方式；plaintext 表示未加密，界面必须如实展示降级状态 */
+interface DesktopKeyStorage {
+  encryptionAvailable: boolean
+  mode: 'encrypted' | 'plaintext'
+}
+
 /** Electron preload 注入的桌面桥接；纯网页环境不存在 */
 interface DesktopBridge {
   isDesktop: true
   /** 启动时已解密的 API Key */
   apiKey: string | null
+  /** 启动时的密钥存储状态快照 */
+  keyStorage: DesktopKeyStorage
   /** 保存 API Key，成功返回 true；false 表示系统加密不可用 */
   setApiKey(key: string | null): Promise<boolean>
+  /** 重新向主进程查询当前存储状态 */
+  getKeyStorage(): Promise<DesktopKeyStorage>
   version: string
 }
 

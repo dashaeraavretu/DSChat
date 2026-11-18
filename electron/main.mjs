@@ -64,6 +64,8 @@ let mainWindow = null
 let settingsFile = ''
 /** 内存中的当前 API Key，preload 通过 sendSync 同步读取 */
 let currentApiKey = null
+/** 当前存档是否为系统加密格式；null 表示尚无存档 */
+let currentKeyEncrypted = null
 
 /**
  * 从 userData/secrets.json 读取 API Key。
@@ -71,6 +73,7 @@ let currentApiKey = null
  * 降级格式：{ version: 1, encrypted: false, apiKey: '<plaintext>' }
  */
 function loadApiKey() {
+  currentKeyEncrypted = null
   try {
     if (!existsSync(settingsFile)) return null
     const parsed = JSON.parse(readFileSync(settingsFile, 'utf8'))
@@ -78,10 +81,12 @@ function loadApiKey() {
     if (typeof parsed.apiKey !== 'string' || parsed.apiKey.length === 0) return null
 
     if (parsed.encrypted === true) {
+      currentKeyEncrypted = true
       if (!safeStorage.isEncryptionAvailable()) {
         console.warn(
           '[settings] 存档已加密，但当前系统无法使用 safeStorage 解密；请重新设置 API Key。'
         )
+        currentKeyEncrypted = null
         return null
       }
       try {
@@ -89,14 +94,30 @@ function loadApiKey() {
         return decrypted.length > 0 ? decrypted : null
       } catch (error) {
         console.warn('[settings] 解密 API Key 失败，已忽略该存档：', error)
+        currentKeyEncrypted = null
         return null
       }
     }
 
+    // 兼容旧版降级存档：文件是明文，界面必须如实显示“未加密”。
+    currentKeyEncrypted = false
     return parsed.apiKey
   } catch (error) {
     console.warn('[settings] 读取 API Key 失败，已按未设置处理：', error)
+    currentKeyEncrypted = null
     return null
+  }
+}
+
+/**
+ * 密钥存储状态，供渲染层在设置页如实展示。
+ * 只要当前存档是明文（或系统加密不可用），mode 就是 plaintext，绝不谎称已加密。
+ */
+function keyStorageStatus() {
+  const encryptionAvailable = safeStorage.isEncryptionAvailable()
+  return {
+    encryptionAvailable,
+    mode: encryptionAvailable && currentKeyEncrypted !== false ? 'encrypted' : 'plaintext',
   }
 }
 
@@ -112,11 +133,13 @@ function saveApiKey(key) {
       if (error.code !== 'ENOENT') throw error
     }
     currentApiKey = null
+    currentKeyEncrypted = null
     return true
   }
 
   let payload
-  if (safeStorage.isEncryptionAvailable()) {
+  const encryptionAvailable = safeStorage.isEncryptionAvailable()
+  if (encryptionAvailable) {
     payload = {
       version: 1,
       encrypted: true,
@@ -152,6 +175,7 @@ function saveApiKey(key) {
   }
 
   currentApiKey = key
+  currentKeyEncrypted = encryptionAvailable
   return true
 }
 
@@ -163,6 +187,12 @@ function registerIpc() {
   ipcMain.on('app:get-version', (event) => {
     event.returnValue = app.getVersion()
   })
+
+  ipcMain.on('settings:get-key-storage', (event) => {
+    event.returnValue = keyStorageStatus()
+  })
+
+  ipcMain.handle('settings:get-key-storage', () => keyStorageStatus())
 
   ipcMain.handle('settings:set-api-key', (_event, key) => {
     if (key !== null && typeof key !== 'string') return false

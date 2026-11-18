@@ -19,6 +19,7 @@ import { useIsMobile } from '../../app/viewport.js'
 import { useChatStore } from '../../services/chat/store.js'
 import { regionCodes, getRegionName, provinces } from '../../services/location.js'
 import {
+  clearApiKey,
   isChineseBrowser,
   setLocale,
   setLocation,
@@ -61,6 +62,7 @@ const SettingsContent = () => {
   const [section, setSection] = useState(() => useSettingsDialog.getState().section)
   // 切换分组不丢失正在输入的 API Key 与导入状态
   const apiKeyEditor = useApiKeyEditor()
+  const clearKey = useClearKey()
   const historyImport = useHistoryImport()
   const historyDelete = useHistoryDelete()
   const replacingHistory = useChatStore((state) => state.importingHistory)
@@ -104,6 +106,23 @@ const SettingsContent = () => {
           ) : (
             <>
               <ApiKeyField editor={apiKeyEditor} />
+              {apiKeyEditor.apiKey ? (
+                <SettingCell
+                  label={t('apiKeyClear')}
+                  status={null}
+                  action={
+                    <Button
+                      variant="dangerOutlined"
+                      size="m"
+                      className={styles.cellButton}
+                      disabled={historyBusy || clearKey.busy}
+                      onClick={clearKey.open}
+                    >
+                      {t('apiKeyClear')}
+                    </Button>
+                  }
+                />
+              ) : null}
               <ImportHistory historyImport={historyImport} disabled={historyBusy} />
               <ExportHistory disabled={historyBusy} />
               <SettingCell
@@ -128,7 +147,80 @@ const SettingsContent = () => {
       </Modal>
       {historyImport.file ? <ImportConfirm historyImport={historyImport} /> : null}
       {historyDelete.opened ? <DeleteAllConfirm historyDelete={historyDelete} /> : null}
+      {clearKey.opened ? <ClearKeyConfirm clearKey={clearKey} /> : null}
     </>
+  )
+}
+
+/** 清除 API Key 的确认与执行；失败时保留现状并提示，不伪装成已清除。 */
+const useClearKey = () => {
+  const [opened, setOpened] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const clearing = useRef(false)
+
+  const confirm = async () => {
+    if (clearing.current) {
+      return
+    }
+    clearing.current = true
+    setBusy(true)
+    try {
+      if (await clearApiKey()) {
+        setOpened(false)
+        showToast({ key: 'apiKeyCleared' })
+      } else {
+        showToast({ key: 'apiKeyClearFailed', type: 'error' })
+      }
+    } catch {
+      showToast({ key: 'apiKeyClearFailed', type: 'error' })
+    } finally {
+      clearing.current = false
+      setBusy(false)
+    }
+  }
+
+  return {
+    opened,
+    busy,
+    open: () => setOpened(true),
+    cancel: () => {
+      if (!clearing.current) {
+        setOpened(false)
+      }
+    },
+    confirm,
+  }
+}
+
+const ClearKeyConfirm = ({ clearKey }: { clearKey: ReturnType<typeof useClearKey> }) => {
+  const t = useTranslate()
+  return (
+    <Modal
+      title={t('apiKeyClearTitle')}
+      className={styles.deleteConfirm}
+      onClose={clearKey.cancel}
+      footer={
+        <div className={styles.deleteActions} aria-busy={clearKey.busy}>
+          <Button
+            variant="outlined"
+            autoFocus
+            disabled={clearKey.busy}
+            onClick={clearKey.cancel}
+          >
+            {t('cancel')}
+          </Button>
+          <Button
+            variant="danger"
+            disabled={clearKey.busy}
+            onClick={() => void clearKey.confirm()}
+          >
+            {t(clearKey.busy ? 'apiKeyClearing' : 'apiKeyClearConfirm')}
+          </Button>
+        </div>
+      }
+    >
+      {t('apiKeyClearDescription')}
+    </Modal>
   )
 }
 
