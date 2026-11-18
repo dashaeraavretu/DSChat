@@ -16,6 +16,15 @@
     color: var(--dsw-alias-brand-primary-invert);
   }
 
+  &:focus-visible {
+    outline: 2px solid var(--dsw-alias-brand-primary);
+    outline-offset: -2px;
+  }
+
+  &:focus-within .action {
+    display: flex;
+  }
+
   @media (hover: hover) {
     &:not(.active):hover {
       background-color: var(--dsw-specific-sidebar-nav-item-hover);

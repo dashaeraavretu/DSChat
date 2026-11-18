@@ -27,17 +27,29 @@ export const Menu = ({
     open,
     { align: 'start', alignOffset: -5, offset: 4 }
   )
-  const close = () => setOpen(false)
+  const close = () => {
+    // 先移回触发按钮；若按钮因 hover/focus 样式隐藏，则回到可聚焦的会话行。
+    const anchor = anchorRef.current
+    const trigger = anchor?.querySelector<HTMLElement>('button')
+    if (trigger && trigger.offsetParent !== null) {
+      trigger.focus({ preventScroll: true })
+    } else {
+      anchor?.closest<HTMLElement>('[role="button"], [tabindex="0"]')?.focus({
+        preventScroll: true,
+      })
+    }
+    setOpen(false)
+  }
   useDismiss(open, [anchorRef, floatingRef], close)
 
   useEffect(() => {
     if (!open) {
       return
     }
-    const frame = requestAnimationFrame(() => {
+    const timer = setTimeout(() => {
       menuRef.current?.querySelector<HTMLElement>('[role="menuitem"]')?.focus()
-    })
-    return () => cancelAnimationFrame(frame)
+    }, 0)
+    return () => clearTimeout(timer)
   }, [open])
 
   const focusItem = (index: number) => {
