@@ -65,7 +65,7 @@ Some capabilities are implemented by the API service rather than the client: sma
 
 ## Data and storage
 
-- **Desktop API key:** encrypted with Electron `safeStorage` (Windows DPAPI) and written to `secrets.json` in the Electron `userData` directory. If system encryption is unavailable, the app warns and writes a clearly marked plaintext fallback to that file; if the IPC save itself fails, the renderer may fall back to `localStorage` for the current session.
+- **Desktop API key:** encrypted with Electron `safeStorage` (Windows DPAPI) and written to `secrets.json` in the Electron `userData` directory. If system encryption is unavailable, the app writes a clearly marked plaintext fallback to that file and the settings screen shows an unencrypted/degraded status; if the IPC save itself fails, the renderer falls back to `localStorage` (still loaded after restart) and shows the same degraded status. Settings also provides a confirmed **Clear API Key** action.
 - **Web API key and settings:** stored in browser `localStorage` (`chat-demo:api-key` and related keys). Use the web build only on a trusted profile.
 - **Conversations and attachment originals:** stored locally in IndexedDB.
 - **History import/export:** ZIP archives containing conversations and locally available image originals. Exports exclude the API key, settings, and original non-image attachments.

@@ -84,9 +84,9 @@ pnpm smoke
   { "version": 1, "encrypted": true, "apiKey": "<base64 密文>" }
   ```
 
-- 写入采用“临时文件 + rename”，降低进程中断导致文件损坏的风险；通过桌面桥接清除 Key 时直接删除该文件。当前设置界面只提供更换/覆盖，没有独立的清除按钮，管理员可删除文件或调用桥接清除。
-- `safeStorage.isEncryptionAvailable()` 返回 false 的少数环境（例如未配置密钥环的 Linux 桌面）会输出警告并退化为明文 `"encrypted": false`。这是明确的降级路径，不是正常状态；此时任何能读取该用户文件的本地程序都可能拿到 Key。Windows 正常安装下不会走该分支。
-- 若 IPC 保存失败，渲染层会警告并回退到 `localStorage`，以保证本次会话可用。排查时应检查 `secrets.json` 的权限和磁盘状态。
+- 写入采用“临时文件 + rename”，降低进程中断导致文件损坏的风险；设置页提供“清除 API Key”，确认后删除该文件、清空主进程内存，并清理旧 localStorage 键。
+- `safeStorage.isEncryptionAvailable()` 返回 false 的少数环境（例如未配置密钥环的 Linux 桌面）会退化为明文 `"encrypted": false`，设置页显示“未加密/降级”。这是明确的降级路径，不是正常状态；此时任何能读取该用户文件的本地程序都可能拿到 Key。Windows 正常安装下不会走该分支。
+- 若 IPC 保存失败，渲染层会回退到 `localStorage`（重启后仍加载），设置页同样显示“未加密/降级”。排查时应检查 `secrets.json` 的权限和磁盘状态。
 - preload 通过 `contextBridge` 只暴露 `isDesktop`、解密后的 `apiKey`、`setApiKey()` 和 `version`；渲染进程没有 Node.js 权限（`contextIsolation: true`、`sandbox: true`、`nodeIntegration: false`）。
 - Key 会出现在主进程与渲染进程内存中；能控制当前操作系统账户或读取进程内存的恶意软件仍可获取。请使用系统账户加密、及时锁屏，并避免把 `secrets.json` 纳入备份或云同步。
 

@@ -322,6 +322,35 @@ function isAllowedInAppNavigation(targetUrl) {
   return false
 }
 
+/** 只接受本应用来源创建的 blob URL，避免放行任意 blob:http(s)://... */
+const previewPrefixes = [`blob:${APP_ORIGIN}/`, ...(DEV ? [`blob:${DEV_ORIGIN}/`] : [])]
+
+const isAllowedPreviewUrl = (targetUrl) =>
+  previewPrefixes.some((prefix) => targetUrl.startsWith(prefix))
+
+/**
+ * 预览子窗口与主窗口同 partition（Chromium 的 blob URL 不能跨 partition 加载），
+ * 但无 preload、启用 sandbox/contextIsolation，且只允许停留在最初的 blob 预览：
+ * 外链、重定向、新窗口一律拦截。
+ */
+function wirePreviewWindow(child, initialUrl) {
+  const blockNavigation = (event, targetUrl) => {
+    if (targetUrl === initialUrl) return
+    event.preventDefault()
+    console.warn('[preview] 已拦截预览子窗口导航：', targetUrl)
+  }
+
+  child.webContents.on('will-navigate', blockNavigation)
+  child.webContents.on('will-redirect', blockNavigation)
+  child.webContents.setWindowOpenHandler(({ url }) => {
+    console.warn('[preview] 已拦截预览子窗口新窗口：', url)
+    return { action: 'deny' }
+  })
+  child.webContents.on('will-attach-webview', (event) => {
+    event.preventDefault()
+  })
+}
+
 function wireWindowSecurity(win) {
   win.webContents.on('will-navigate', (event, targetUrl) => {
     if (isAllowedInAppNavigation(targetUrl)) return
@@ -330,15 +359,9 @@ function wireWindowSecurity(win) {
   })
 
   win.webContents.setWindowOpenHandler(({ url }) => {
-    // 附件原件与图片预览使用 blob: URL（见 MessageFile.tsx），由本应用同源
-    // 的渲染进程创建。这里放行成受控的只读子窗口；http/https 仍交给系统浏览器。
-    let protocol = ''
-    try {
-      protocol = new URL(url).protocol
-    } catch {
-      // about:blank 等非 URL 情形按外部链接处理
-    }
-    if (protocol === 'blob:') {
+    // 附件原件与图片预览使用本应用来源的 blob: URL（见 MessageFile.tsx）。
+    // 同 partition 放行为受控的只读子窗口；http/https 仍交给系统浏览器。
+    if (isAllowedPreviewUrl(url)) {
       return {
         action: 'allow',
         overrideBrowserWindowOptions: {
@@ -357,6 +380,10 @@ function wireWindowSecurity(win) {
 
     openExternalUrl(url)
     return { action: 'deny' }
+  })
+
+  win.webContents.on('did-create-window', (child, details) => {
+    wirePreviewWindow(child, details.url)
   })
 
   win.webContents.on('render-process-gone', (_event, details) => {

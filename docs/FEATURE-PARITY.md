@@ -351,7 +351,7 @@
 - 录音在页面内编码为 16 kHz、单声道、16-bit PCM 的 WAV；大小上限 8 MiB。
 - 转写通过 `POST /v1/tools/asr`，只上传音频；空结果提示“未检测到语音”，失败提示并可重试。
 - 转写中可取消；取消后不插入文本、不残留录音资源。
-- 麦克风权限拒绝、无设备、非安全上下文分别提示；桌面版只向受信任页面（`dsc://app` 或开发服务器）放行音频权限，拒绝摄像头。
+- 麦克风权限拒绝、无设备、非安全上下文分别提示；桌面版只向受信任页面（`dsc://app` 或开发服务器）放行音频权限；摄像头单独请求或 `audio+video` 组合请求一律拒绝。
 - 窄于 768 px 时，录音中在输入框首行显示实时频谱；桌面窗口缩窄同样适用。
 
 **验证步骤**
@@ -535,8 +535,8 @@
 - 每个用户使用自己的 Key；首次无 Key 自动打开设置，校验通过才保存。
 - 校验使用 `GET /models`（不产生生成费用）。
 - Key 优先用 Electron `safeStorage` 加密后写入 `userData/secrets.json`（Windows DPAPI）；文件采用临时文件 + rename。
-- 通过桌面桥接调用 `setApiKey(null)` 时删除文件并清空内存；重启自动加载解密后的 Key。当前设置界面只提供更换/覆盖，没有独立的“清除 Key”按钮（见缺口）。
-- `safeStorage` 不可用时警告并退化为明文 `"encrypted": false`；IPC 保存失败时渲染层回退 localStorage 并警告。
+- 设置页提供“清除 API Key”：确认后通过桥接删除文件、清空内存并清理旧 localStorage 键；重启自动加载解密后的 Key。
+- `safeStorage` 不可用时退化为明文 `"encrypted": false`，设置页显示“未加密/降级”；IPC 保存失败时渲染层回退 localStorage（重启后仍加载），同样标记为降级。
 - 网页版仍使用 `localStorage` 的 `chat-demo:api-key`；桌面端迁移旧键成功后删除。
 - Key 不进入历史导出、日志、构建产物。
 
@@ -546,7 +546,7 @@
 2. 输入有效 Key，确认 `secrets.json` 的 `encrypted: true` 且无明文。
 3. 重启确认无需重输；通过桥接清除后文件消失。
 4. 校验文件权限、临时文件清理和异常 JSON 的容错。
-5. 模拟加密不可用（开发构建打桩），确认警告与明文降级标记。
+5. 模拟加密不可用（开发构建打桩），确认设置页显示“未加密/降级”，而不是“已加密”。
 6. 网页版写入旧键后启动桌面版，确认迁移并删除 localStorage 旧键。
 
 **v1 状态：复刻（桌面适配）。**
@@ -558,8 +558,8 @@
 - 使用 `dsc://app` 自定义协议加载 `dist/`：`standard`、`secure`、支持 fetch/CORS/stream，使 IndexedDB、localStorage、WebCrypto、getUserMedia 正常工作。
 - 开发模式 `DSCHAT_DEV=1` 加载 `http://localhost:8090`。
 - `contextIsolation: true`、`sandbox: true`、`nodeIntegration: false`；preload 只暴露白名单桥接。
-- 外部链接通过系统浏览器打开；应用内禁止任意外部导航和 `<webview>`。附件/图片原件的同源 `blob:` 预览使用受控只读子窗口；`data:` URL 不放行（主进程仅匹配 `blob:`）。
-- 只放行受信任页面的音频权限，拒绝摄像头。
+- 外部链接通过系统浏览器打开；应用内禁止任意外部导航和 `<webview>`。附件/图片原件的同源 `blob:` 预览使用同 partition、无 preload、`sandbox`/`contextIsolation` 的只读子窗口；子窗口只允许停留在初始 `blob:`，外部导航、重定向与新窗口全部拦截；`data:` URL 不放行。父级 localStorage 隔离未在 0.1.3 实现，defer 到 v1.1。
+- 只放行受信任页面的音频权限；摄像头及 `audio+video` 组合请求一律拒绝。
 - 单实例锁；生产包禁用 DevTools；窗口最小尺寸 900×620；应用标题 DSChat。
 - 支持 `--smoke` 启动检查。
 
@@ -568,8 +568,8 @@
 1. 打包版启动后检查地址为 `dsc://app/index.html`，存储、麦克风、图表均正常。
 2. 在控制台确认 `require` / `process` 不可用。
 3. 点击正文链接和来源链接，确认系统浏览器打开。
-4. 尝试打开 http(s) 外部链接，确认交给系统浏览器；确认同源 `blob:` 附件预览可用，`data:` 与 `javascript:` URL 被拒绝。
-5. 请求摄像头权限，确认被拒绝；请求麦克风在受信任页面可用。
+4. 尝试打开 http(s) 外部链接，确认交给系统浏览器；确认同源 `blob:` 附件预览可用，`data:` 与 `javascript:` URL 被拒绝；在预览子窗口内尝试跳转或打开新窗口，确认被拦截且 URL 仍为初始 `blob:`。
+5. 分别请求麦克风、摄像头与 `audio+video` 组合：仅麦克风可用，后两者被拒绝。
 6. 启动第二个实例，确认聚焦已有窗口。
 7. 生产包确认 DevTools 不可用。
 
@@ -582,7 +582,7 @@
 1. **服务端扩展依赖**：智能搜索、链接阅读、ASR/TTS、安全过滤、自动标题、继续生成、`latest_reminder` 均需 DeepSeek 官方或兼容服务支持。仅替换普通 OpenAI 风格接口不足以实现这些功能。
 2. **`document` 块兼容性**：应用始终开启扩展模式（`safety_check: high`、`deepseek_read_url`），而类型注释指出扩展模式可能不支持非图片 `document` 块并返回 400。PDF/Office/文本附件必须在目标服务上单独验收。
 3. **`dsc://app` CORS 风险**：渲染层从自定义协议源直接请求 API，没有主进程代理。若服务端只允许网页源或不允许 `dsc://app`，打包版请求会失败。上线前必须验证；必要时补主进程代理。
-4. **本地附件打开（v1 已处理）**：已发送的附件/图片原件通过 `window.open(blob:…)` 打开；主进程仅对 `blob:` 放行受控只读子窗口，`data:` 不放行，`http/https` 仍交给系统浏览器。`pnpm smoke:blob` 覆盖该路径，打包版实测通过。
+4. **本地附件打开（v1 已处理）**：已发送的附件/图片原件通过 `window.open(blob:…)` 打开；主进程仅对同源 `blob:` 放行受控只读子窗口（同 partition、无 preload、`sandbox`/`contextIsolation`），子窗口导航、重定向与新窗口均被拦截；`data:` 不放行，`http/https` 仍交给系统浏览器。`pnpm smoke:blob` 与真实 PNG/PDF 预览实测通过。预览与主窗口同源，父级 localStorage 隔离 defer 到 v1.1。
 5. **密钥生命周期**：设置页已提供“清除 API Key”（确认后删除 `secrets.json`、主进程内存与旧 localStorage 键）；仍没有启动时校验。`safeStorage` 不可用或回退 localStorage 时，设置页按主进程状态显示“未加密/降级”，不再声称已加密；发布说明仍应披露降级路径。
 6. **网页版与桌面版数据不互通**：`localhost:8090`、`dsc://app` 和 `file://` 是不同存储源，会话/附件不会自动迁移；只有 API Key 有迁移逻辑。历史需通过 ZIP 导入导出。
 7. **远端文件生命周期**：`deleteFile` 从未调用；删除会话、移除附件或删除全部对话都不会删除已上传到 API 服务的文件，可能累积占用配额，且删除确认文案与实际行为不一致。

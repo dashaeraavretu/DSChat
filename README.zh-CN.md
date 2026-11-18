@@ -66,7 +66,7 @@ DSChat v1 在桌面端复刻官方 demo 的功能：
 
 ## 数据与安全
 
-- **桌面端 API Key：** 经 Electron `safeStorage`（Windows DPAPI）加密后写入 `userData` 目录下的 `secrets.json`。若系统加密不可用，应用会警告并在该文件中写入明确标注的明文降级数据；若 IPC 保存失败，渲染层可能回退到 `localStorage`（仅当前会话可用）。
+- **桌面端 API Key：** 经 Electron `safeStorage`（Windows DPAPI）加密后写入 `userData` 目录下的 `secrets.json`。若系统加密不可用，应用会在该文件中写入明确标注的明文降级数据，设置页显示“未加密/降级”；若 IPC 保存失败，渲染层回退到 `localStorage`（重启后仍加载），同样显示降级状态。设置页还提供带确认的「清除 API Key」。
 - **网页版 API Key 与设置：** 保存在浏览器 `localStorage`（`chat-demo:api-key` 等键）。网页版请只在可信的浏览器配置中使用。
 - **会话与附件原件：** 保存在本机 IndexedDB。
 - **历史导入导出：** ZIP 归档，包含会话与本地可用的图片原件；导出不包含 API Key、设置和非图片附件原件。
