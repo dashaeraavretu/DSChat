@@ -14,7 +14,7 @@ export const en = {
     'Chats or attachments have not been saved locally. Retry before closing this page.',
   sessionDeleteFailed: 'Unable to delete this chat. Please try again.',
   settings: 'Settings',
-  appName: 'API usage demo',
+  appName: 'DSChat',
   deleteSessionModalContentTitle: 'Delete chat?',
   deleteSessionWithFilesDescription:
     'This chat and its uploaded files will be permanently deleted and cannot be recovered. Delete this chat?',
@@ -105,6 +105,9 @@ export const en = {
   avatarMenuSettingsDialogThemeSelectSystemOption: 'System',
   apiKeyStart: 'Enter an API Key to get started',
   apiKeyEdit: 'Edit API Key',
+  apiKeyDesktopStorageHint:
+    'Stored only on this device and encrypted by the operating system. It is never uploaded to a server.',
+  apiKeyWebStorageHint: "The API Key is saved in your browser's local storage.",
   apiKeyPlaceholder: 'Enter API Key',
   apiKeyVerifying: 'Verifying...',
   confirm: 'Confirm',

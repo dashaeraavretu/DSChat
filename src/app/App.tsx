@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { useTranslate } from '../i18n/index.js'
-import { useSettings } from '../services/settings.js'
+import { isDesktopApp, migrateLegacyApiKey, useSettings } from '../services/settings.js'
 import { useIsMobile, useMobileViewport, usePreventPageScroll } from './viewport.js'
 import {
   bindChatPersistence,
@@ -69,8 +69,13 @@ export const App = () => {
 
   useEffect(() => {
     void initChat()
-    // 首次打开先在设置里输入 API Key
-    ensureApiKey()
+    // 首次打开先在设置里输入 API Key；桌面端先把网页版遗留的 Key 迁移到系统加密存储
+    if (isDesktopApp()) {
+      // 迁移失败也照常检查 API Key，不阻塞应用
+      void migrateLegacyApiKey().then(ensureApiKey, ensureApiKey)
+    } else {
+      ensureApiKey()
+    }
   }, [])
 
   return (

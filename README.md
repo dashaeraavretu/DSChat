@@ -1,61 +1,110 @@
-# chat-demo
+# DSChat
 
 English | [简体中文](README.zh-CN.md)
 
-A static chat demo powered by the DeepSeek API. No application backend is required: the browser connects directly to the configured API service.
+DSChat is a Windows desktop chat client for the DeepSeek API, built as an Electron wrapper around the official [deepseek-ai/chat-demo](https://github.com/deepseek-ai/chat-demo) web demo. The v1 goal is feature parity with the demo: the same conversations, streaming replies, search, attachments, speech, rendering, themes, and history tools, packaged as a native desktop app.
 
-You can [try the app online](https://deepseek-ai.github.io/chat-demo/) or download the archive from [Releases](https://github.com/deepseek-ai/deepseek-chat-demo/releases), extract it, and double-click `index.html` to use it locally without installation or a build. Enter your API key in Settings before your first chat.
+There is no application backend. Each user brings their own DeepSeek API key and the app talks directly to the configured API service. The key is encrypted with the operating system's credential protection (Electron `safeStorage`) and stored locally in the app's `userData` directory; it is never bundled, logged, exported, or sent anywhere except the API service you configure.
 
-## Getting started
+## Requirements
 
-Install Node.js 22.12+ and pnpm, then run:
+- Windows 10/11 (x64)
+- Node.js 22.12 or newer
+- pnpm
+
+## Build and run
 
 ```sh
-git clone https://github.com/deepseek-ai/chat-demo.git
-cd chat-demo
+git clone <this-repository>
+cd <repository>
 pnpm install
-pnpm dev
 ```
 
-Open http://localhost:8090.
-
-To build the static site:
+Web version (same UI as the official demo):
 
 ```sh
-pnpm build
+pnpm dev       # development server at http://localhost:8090
+pnpm build     # static site in dist/
 ```
 
-The output is written to `dist/`. Deploy it to a static web server or open `dist/index.html` directly. Opening the file directly requires browser support for storage on `file://` pages and an API service that permits their cross-origin requests.
+Desktop version:
+
+```sh
+pnpm dev:desktop  # Electron shell with the development server
+pnpm start        # build and launch the desktop app
+pnpm smoke        # launch the built app and exit after page load
+pnpm dist:dir     # unpacked desktop app for local testing
+pnpm dist:win     # Windows installer / distributable
+```
+
+`pnpm build` produces the web assets in `dist/`. Packaging commands use electron-builder and write installers to `release/` as configured by `build.directories.output` in [package.json](package.json).
+
+See [docs/SELF-HOST.md](docs/SELF-HOST.md) for a complete self-hosting and redistribution guide, including custom API origins, Windows script notes, microphone permissions, proxies, and `file://` limitations.
+
+## Using DSChat
+
+1. Launch the desktop app.
+2. Open Settings and enter your DeepSeek API key. The app verifies it before saving.
+3. Chat as in the official demo. The key can be replaced at any time in Settings.
+
+Get an API key from the [DeepSeek platform](https://platform.deepseek.com/). Usage is billed to your own account.
 
 ## Features
 
+DSChat v1 aims to reproduce the official demo's feature set on the desktop:
+
 - Multiple conversations with automatic titles, renaming, and deletion; edit prompts, regenerate replies, and switch between message branches.
 - Streaming replies, deep thinking, smart search, link reading, and source citations; stop generation or continue eligible replies.
-- Upload, paste, or drag and drop attachments; use voice input and read replies aloud. A live audio spectrum appears in the first row of the input area while recording on mobile.
+- Upload, paste, or drag and drop attachments; voice input and read replies aloud. A live audio spectrum appears in the first row of the input area while recording on mobile layouts.
 - Markdown, syntax highlighting, KaTeX math, and Mermaid diagrams.
-- Simplified Chinese and English, light and dark themes, mobile layouts, location settings, and chat history import and export.
+- Simplified Chinese and English, light and dark themes (including follow-system), mobile layouts, location settings, and chat history import and export.
+
+A per-feature checklist with expected desktop behavior, verification steps, and known server-side dependencies is in [docs/FEATURE-PARITY.md](docs/FEATURE-PARITY.md). Manual release checks are in [docs/QA-CHECKLIST.md](docs/QA-CHECKLIST.md).
+
+Some capabilities are implemented by the API service rather than the client: smart search, link reading, speech recognition (ASR), read-aloud (TTS), attachment validation, automatic titles, continuation, and content-safety filtering require a compatible DeepSeek service. The desktop port does not reimplement them locally; it preserves the original request/response protocol. See the API capability matrix in the parity document.
 
 ## Data and storage
 
-Your API key and settings are stored in the browser's localStorage. Conversations and original attachments are stored in IndexedDB. Local data is isolated by browser profile and site origin. Sending messages, uploading attachments, and using speech features sends the relevant content to the configured API service.
+- **Desktop API key:** encrypted with Electron `safeStorage` (Windows DPAPI) and written to `secrets.json` in the Electron `userData` directory. If system encryption is unavailable, the app warns and writes a clearly marked plaintext fallback to that file; if the IPC save itself fails, the renderer may fall back to `localStorage` for the current session.
+- **Web API key and settings:** stored in browser `localStorage` (`chat-demo:api-key` and related keys). Use the web build only on a trusted profile.
+- **Conversations and attachment originals:** stored locally in IndexedDB.
+- **History import/export:** ZIP archives containing conversations and locally available image originals. Exports exclude the API key, settings, and original non-image attachments.
+- **Delete all chats:** clears local conversations, attachment originals, and unsent drafts; the API key and settings are preserved.
+- **Network:** messages, attachments, and speech audio are sent to the configured API service. Uploaded files remain subject to that service's retention policy.
 
-History import and export in Settings use ZIP archives. After confirmation and successful validation, importing replaces all local conversations and attachments. Exports include conversations and locally available original images, but exclude API keys, settings, and original non-image attachments. See the [history import/export documentation (Chinese)](src/services/chat/history/README.md) for the archive format and preservation details.
+See [src/services/chat/history/README.md](src/services/chat/history/README.md) for the archive format.
 
-Settings → Data → Delete all chats clears all local conversations, original attachments, and unsent drafts after confirmation. It stops ongoing replies and returns to a new chat. Your API key and settings are preserved; files already uploaded to the API service are not deleted.
+## Custom API origin
+
+The API origin is fixed at build time. By default it is `https://api.deepseek.com`; set `DSCHAT_API_ORIGIN` when building to target a compatible gateway or self-hosted endpoint:
+
+```sh
+# Git Bash / macOS / Linux
+DSCHAT_API_ORIGIN=https://api.example.com pnpm build
+
+# PowerShell
+$env:DSCHAT_API_ORIGIN = "https://api.example.com"; pnpm build
+```
+
+The endpoint must implement the Anthropic-compatible Messages / Files API and the extensions used by the demo (search, link reading, titles, `latest_reminder`, ASR/TTS). See [docs/SELF-HOST.md](docs/SELF-HOST.md) for details and security considerations.
 
 ## Development
 
-| Command       | Description                  |
-| ------------- | ---------------------------- |
-| `pnpm dev`    | Start the development server |
-| `pnpm build`  | Build into `dist/`           |
-| `pnpm type`   | Run TypeScript type checks   |
-| `pnpm lint`   | Lint with oxlint             |
-| `pnpm format` | Format with oxfmt            |
+| Command           | Description                                   |
+| ----------------- | --------------------------------------------- |
+| `pnpm dev`        | Start the web development server on port 8090 |
+| `pnpm dev:desktop`| Run the Electron shell with the dev server    |
+| `pnpm build`      | Build the web assets into `dist/`             |
+| `pnpm start`      | Build and launch the desktop app              |
+| `pnpm smoke`      | Launch the built app and exit after page load |
+| `pnpm dist:dir`   | Package an unpacked desktop app in `release/` |
+| `pnpm dist:win`   | Package the Windows installer in `release/`   |
+| `pnpm type`       | Run TypeScript type checks                    |
+| `pnpm lint`       | Lint with oxlint                              |
+| `pnpm format`     | Format with oxfmt                             |
+| `node tests/smoke.mjs` | Zero-dependency post-build smoke test    |
 
-[rspack.config.ts](rspack.config.ts) uses `https://api.deepseek.com` by default. Use `createConfig({ apiOrigin, devServer })` to customize the API origin and development server proxy.
-
-Chat uses `deepseek-flash` by default through Anthropic-compatible Messages / Files APIs. Speech features use ASR / TTS endpoints. Requests include extensions for search, link reading, titles, and `latest_reminder`, so the configured service must support the corresponding capabilities. Supported attachment formats are determined by server-side validation.
+The source layout follows the upstream demo:
 
 ```text
 src/
@@ -68,8 +117,13 @@ src/
     markdown/          Markdown parsing, syntax highlighting, and diagrams
     speech/            Audio recording and read-aloud playback
   utils/               Shared utilities
+electron/              Main process, preload bridge, and desktop integration
+tests/                 Smoke tests
+docs/                  Parity, self-hosting, and QA documentation
 ```
 
-## License
+## Upstream and license
 
-[MIT](LICENSE). The build copies the license to `dist/LICENSE`; include it when distributing the app. Third-party dependencies are subject to their own licenses.
+This project is a derivative of [deepseek-ai/chat-demo](https://github.com/deepseek-ai/chat-demo), Copyright (c) 2026 DeepSeek, licensed under the [MIT License](LICENSE). The upstream attribution and license notice are retained. Builds copy the license to `dist/LICENSE`; include it when redistributing. Third-party dependencies remain subject to their own licenses.
+
+DSChat is an independent community desktop wrapper and is not an official DeepSeek product. Do not use DeepSeek names or marks in a way that suggests endorsement.

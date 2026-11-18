@@ -1,13 +1,23 @@
 {
-  "name": "chat-demo",
+  "name": "dschat-desktop",
   "version": "0.1.1",
-  "description": "基于 DeepSeek API 的静态聊天示例。",
+  "description": "DSChat：基于 DeepSeek 开源 chat-demo 的跨平台桌面聊天客户端。",
   "license": "MIT",
+  "author": "DSChat contributors",
   "private": true,
   "type": "module",
+  "main": "electron/main.mjs",
   "scripts": {
     "dev": "rspack serve -c rspack.config.ts",
-    "build": "rm -rf dist && NODE_ENV=production rspack build -c rspack.config.ts",
+    "dev:desktop": "concurrently -k \"rspack serve -c rspack.config.ts\" \"wait-on tcp:8090 && cross-env DSCHAT_DEV=1 electron .\"",
+    "build:web": "rimraf dist && cross-env NODE_ENV=production rspack build -c rspack.config.ts",
+    "build": "pnpm build:web",
+    "start": "pnpm build && electron .",
+    "smoke": "electron . --smoke",
+    "smoke:blob": "electron . --smoke-blob",
+    "icon": "node scripts/generate-icon.mjs",
+    "dist:win": "pnpm build && electron-builder --win",
+    "dist:dir": "pnpm build && electron-builder --win --dir",
     "type": "tsc -p tsconfig.json",
     "lint": "oxlint src rspack.config.ts",
     "format": "oxfmt --write ."
@@ -35,13 +45,62 @@
     "zustand": "4.4.7"
   },
   "devDependencies": {
+    "@resvg/resvg-js": "^2.6.2",
     "@rspack/cli": "2.0.2",
     "@rspack/core": "2.0.2",
     "@rspack/dev-server": "2.0.1",
     "@swc/helpers": "0.5.23",
     "@types/node": "~20.9.2",
+    "concurrently": "^10.0.7",
+    "cross-env": "^10.1.0",
+    "electron": "^45.3.3",
+    "electron-builder": "^26.18.0",
     "oxfmt": "0.48.0",
     "oxlint": "1.63.0",
-    "typescript": "7.0.2"
+    "rimraf": "^6.1.4",
+    "typescript": "7.0.2",
+    "wait-on": "^9.5.1"
+  },
+  "build": {
+    "appId": "com.dschat.desktop",
+    "productName": "DSChat",
+    "asar": true,
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "build/icon.png",
+      "!**/*.map",
+      "!node_modules/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "LICENSE",
+        "to": "LICENSE"
+      }
+    ],
+    "win": {
+      "icon": "build/icon.png",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "${productName}-${version}-${arch}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "DSChat"
+    }
   }
 }

@@ -1,6 +1,7 @@
 node_modules/
 dist/
-build/
+release/
+out/
 .pnpm-store/
 .cache/
 *.log
@@ -9,3 +10,4 @@ build/
 .env.*
 !.env.example
 tmp/
+*.tsbuildinfo

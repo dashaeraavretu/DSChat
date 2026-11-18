@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { IconEditOutline16 } from '../base/icons.js'
-import { useSettings } from '../../services/settings.js'
+import { isDesktopApp, useSettings } from '../../services/settings.js'
 import { useIsMobile } from '../../app/viewport.js'
 import { IconButton } from '../base/IconButton.js'
 import { useApiKeyForm } from './useApiKeyForm.js'
@@ -27,6 +27,9 @@ export const ApiKeyField = ({ editor }: { editor: ApiKeyEditor }) => {
     <div className={styles.cell}>
       <div className={styles.apiKey}>
         <div className={styles.label}>{t('apiKeyStart')}</div>
+        <div className={styles.description}>
+          {t(isDesktopApp() ? 'apiKeyDesktopStorageHint' : 'apiKeyWebStorageHint')}
+        </div>
         {apiKey && !editing ? (
           <div className={styles.apiKeySaved}>
             <span className={styles.apiKeyMask}>{'*'.repeat(apiKey.length)}</span>

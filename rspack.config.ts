@@ -89,5 +89,9 @@ export const createConfig = ({
   devServer: { port: 8090, ...devServer },
 })
 
+// 构建期可用 DSCHAT_API_ORIGIN 覆盖 API 地址，例如指向本地代理；
+// 未设置时保持官方地址。
+const apiOrigin = process.env.DSCHAT_API_ORIGIN?.trim() || 'https://api.deepseek.com'
+
 // eslint-disable-next-line import/no-default-export
-export default defineConfig(createConfig())
+export default defineConfig(createConfig({ apiOrigin }))
