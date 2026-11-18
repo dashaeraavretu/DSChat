@@ -25,10 +25,13 @@ import {
   setCloseToTray,
   setLocale,
   setLocation,
+  setNotifyOnComplete,
   setThemePreference,
   setTtsVoice,
+  setZoomPreference,
   useSettings,
   type ThemePreference,
+  type ZoomFactor,
 } from '../../services/settings.js'
 import {
   API_MODEL,
@@ -83,6 +86,16 @@ const SettingsContent = () => {
         closable
         className={styles.dialog}
         mainClassName={styles.dialogMain}
+        footer={
+          <div className={styles.aboutBar}>
+            <span className={styles.aboutText}>
+              {`DSChat v${APP_VERSION} · ${API_ORIGIN} · ${API_MODEL}`}
+            </span>
+            <button type="button" className={styles.aboutLink} onClick={() => setAboutOpen(true)}>
+              {t('about')}
+            </button>
+          </div>
+        }
         onClose={() => {
           if (!historyDelete.busy) {
             closeSettings()
@@ -112,6 +125,8 @@ const SettingsContent = () => {
               <TtsVoiceSetting />
               <LocationSetting />
               <CloseToTraySetting />
+              <NotificationSetting />
+              <ZoomSetting />
             </>
           ) : (
             <>
@@ -153,14 +168,6 @@ const SettingsContent = () => {
               {isMobile ? <ApiKeyConfirm editor={apiKeyEditor} /> : null}
             </>
           )}
-        </div>
-        <div className={styles.aboutBar}>
-          <span className={styles.aboutText}>
-            {`DSChat v${APP_VERSION} · ${API_ORIGIN} · ${API_MODEL}`}
-          </span>
-          <button type="button" className={styles.aboutLink} onClick={() => setAboutOpen(true)}>
-            {t('about')}
-          </button>
         </div>
       </Modal>
       {historyImport.file ? <ImportConfirm historyImport={historyImport} /> : null}
@@ -537,6 +544,58 @@ const CloseToTraySetting = () => {
         >
           <span className={styles.switchThumb} />
         </button>
+      }
+    />
+  )
+}
+
+const NotificationSetting = () => {
+  const t = useTranslate()
+  const notifyOnComplete = useSettings((state) => state.notifyOnComplete)
+  const desktop = isDesktopApp()
+  return (
+    <SettingCell
+      label={t('settingsNotifyOnComplete')}
+      description={
+        desktop
+          ? t('settingsNotifyOnCompleteDescription')
+          : t('settingsNotifyOnCompleteDesktopOnly')
+      }
+      status={null}
+      action={
+        <button
+          type="button"
+          role="switch"
+          aria-checked={notifyOnComplete}
+          aria-label={t('settingsNotifyOnComplete')}
+          className={clsx(styles.switch, notifyOnComplete && styles.switchOn)}
+          disabled={!desktop}
+          onClick={() => setNotifyOnComplete(!notifyOnComplete)}
+        >
+          <span className={styles.switchThumb} />
+        </button>
+      }
+    />
+  )
+}
+
+const ZoomSetting = () => {
+  const t = useTranslate()
+  const zoomFactor = useSettings((state) => state.zoomFactor)
+  return (
+    <SettingCell
+      label={t('settingsZoom')}
+      status={null}
+      action={
+        <Select
+          ariaLabel={t('settingsZoom')}
+          value={String(zoomFactor)}
+          options={[0.9, 1, 1.1, 1.25].map((factor) => ({
+            value: String(factor),
+            label: `${Math.round(factor * 100)}%`,
+          }))}
+          onChange={(value) => setZoomPreference(Number(value) as ZoomFactor)}
+        />
       }
     />
   )

@@ -6,6 +6,7 @@ import {
   Menu,
   nativeImage,
   net,
+  Notification,
   protocol,
   safeStorage,
   screen,
@@ -374,11 +375,71 @@ function registerIpc() {
     event.returnValue = { closeToTray: windowState.closeToTray === true }
   })
 
+  ipcMain.handle('window:set-zoom-factor', (event, factor) => {
+    const senderUrl = event.senderFrame?.url ?? event.sender.getURL()
+    if (!isTrustedPageUrl(senderUrl) || typeof factor !== 'number' || !Number.isFinite(factor)) {
+      return false
+    }
+    const clamped = Math.min(1.25, Math.max(0.9, factor))
+    try {
+      mainWindow?.webContents.setZoomFactor(clamped)
+      return true
+    } catch {
+      return false
+    }
+  })
+
+  ipcMain.handle('app:notify-done', (event, payload) => {
+    const senderUrl = event.senderFrame?.url ?? event.sender.getURL()
+    if (!isTrustedPageUrl(senderUrl)) return false
+    // 窗口已聚焦时不再打扰；设置开关由渲染层决定是否调用
+    if (mainWindow?.isFocused()) return false
+    const title = typeof payload?.title === 'string' ? payload.title : APP_NAME
+    const body = typeof payload?.body === 'string' ? payload.body : ''
+    try {
+      const notification = new Notification({ title, body })
+      notification.on('click', () => {
+        mainWindow?.show()
+        mainWindow?.focus()
+      })
+      notification.show()
+      return true
+    } catch (error) {
+      logger?.warn(`完成通知发送失败：${error instanceof Error ? error.message : String(error)}`)
+      return false
+    }
+  })
+
   ipcMain.handle('desktop:set-close-to-tray', (_event, enabled) => {
     writeWindowState({ closeToTray: enabled === true })
     if (enabled === true) createTray()
     updateTrayMenu()
     return true
+  })
+
+  ipcMain.handle('file:save-text', async (event, payload) => {
+    const senderUrl = event.senderFrame?.url ?? event.sender.getURL()
+    if (!isTrustedPageUrl(senderUrl)) return false
+    const content = typeof payload?.content === 'string' ? payload.content : ''
+    if (!content || content.length > 5 * 1024 * 1024) return false
+    const requested = typeof payload?.defaultName === 'string' ? payload.defaultName : 'export.md'
+    const name = path.basename(requested).slice(0, 120) || 'export.md'
+    const options = {
+      defaultPath: path.join(app.getPath('downloads'), name),
+      filters: [{ name: 'Markdown', extensions: ['md'] }],
+    }
+    const owner = mainWindow && !mainWindow.isDestroyed() ? mainWindow : undefined
+    const result = owner
+      ? await dialog.showSaveDialog(owner, options)
+      : await dialog.showSaveDialog(options)
+    if (result.canceled || !result.filePath) return false
+    try {
+      writeFileSync(result.filePath, content, 'utf8')
+      return true
+    } catch (error) {
+      logger?.error('保存导出文件失败', error)
+      return false
+    }
   })
 
   ipcMain.handle('diagnostics:export', async (event, info) => {
@@ -785,6 +846,16 @@ function buildMenu() {
           label: tMain('搜索对话', 'Search chats'),
           accelerator: 'CmdOrCtrl+K',
           click: () => sendRendererCommand('search'),
+        },
+        {
+          label: tMain('设置', 'Settings'),
+          accelerator: 'CmdOrCtrl+,',
+          click: () => sendRendererCommand('settings'),
+        },
+        {
+          label: tMain('关闭弹窗或停止生成', 'Close dialog or stop'),
+          accelerator: 'Esc',
+          click: () => sendRendererCommand('escape'),
         },
       ],
     },

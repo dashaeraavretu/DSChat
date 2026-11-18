@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { translate } from '../../i18n/index.js'
 import { createId } from '../../utils/id.js'
 import { ApiError, streamMessage } from '../api/client.js'
 import { API_MODEL, FEATURES } from '../buildInfo.js'
@@ -754,6 +755,63 @@ export const retryUpload = (sessionId: string, messageId: string) => {
   void streamReply(sessionId, reply, { history: path.slice(0, index - 1), question })
 }
 
+/**
+ * 网络中断后重试同一条回复：不新增消息/分支。
+ * 已有内容且允许作为前缀时原地续拉；否则清空内容后用同一消息重新请求。
+ */
+export const retryReply = (sessionId: string, messageId: string) => {
+  if (get().importingHistory || deletingSessions.has(sessionId)) {
+    return
+  }
+  const session = getSession(sessionId)
+  if (!session || getStreamController(sessionId)) {
+    return
+  }
+  const path = getVisibleMessages(session)
+  const index = path.findIndex((message) => message.id === messageId)
+  const question = path[index - 1]
+  const previous = path[index]
+  if (
+    question?.role !== 'user' ||
+    previous?.role !== 'assistant' ||
+    previous.id !== path.at(-1)?.id ||
+    (previous.error?.kind !== 'network' && previous.error?.kind !== 'interrupted')
+  ) {
+    return
+  }
+
+  const { thinking, search } = useSettings.getState()
+  const canResume =
+    previous.prefix !== false &&
+    previous.blocks.length > 0 &&
+    !previous.blocks.some(
+      (block) =>
+        block.type === 'server_tool_use' ||
+        block.type === 'web_search_tool_result' ||
+        block.type === 'web_fetch_tool_result'
+    )
+  const reply: AssistantMessage = {
+    ...previous,
+    model: previous.model ?? MODEL,
+    thinking: previous.thinking ?? thinking,
+    search: FEATURES.webTools ? (previous.search ?? search) : false,
+    status: 'pending',
+    stopReason: undefined,
+    stopDetails: undefined,
+    error: undefined,
+    completedAt: undefined,
+    ...(canResume ? {} : { blocks: [], usage: undefined }),
+  }
+  updateReply(sessionId, reply)
+  updateSession(sessionId, (state) => ({ ...state, updatedAt: Date.now() }))
+  persist(sessionId)
+  void streamReply(sessionId, reply, {
+    history: path.slice(0, index - 1),
+    question,
+    ...(canResume ? { prefix: previous } : {}),
+  })
+}
+
 type Request = { history: Message[]; question: UserMessage; prefix?: AssistantMessage }
 
 /** 把补传得到的 serverId 写回会话里所有引用同一附件的消息（编辑、重新生成会共用附件） */
@@ -1095,5 +1153,19 @@ const streamReply = async (sessionId: string, initial: AssistantMessage, request
       ),
     }))
     persist(sessionId)
+
+    // 仅完成、耗时超过 15 秒且用户允许时通知；是否聚焦由主进程再次判断
+    if (
+      reply.status === 'done' &&
+      reply.completedAt !== undefined &&
+      reply.completedAt - reply.createdAt >= 15_000 &&
+      useSettings.getState().notifyOnComplete
+    ) {
+      const title = getSession(sessionId)?.title?.trim() || translate('appName')
+      void window.desktop?.notifyGenerationDone?.({
+        title: translate('appName'),
+        body: translate('generationCompleteBody', { title }),
+      })
+    }
   }
 }

@@ -16,6 +16,10 @@ export type ThemePreference = 'light' | 'dark' | 'system'
  */
 export type ApiKeyStorage = 'encrypted' | 'plaintext' | 'localStorage' | 'web'
 
+/** 可用缩放档位；与设置下拉一致 */
+export type ZoomFactor = 0.9 | 1 | 1.1 | 1.25
+const ZOOM_FACTORS: ZoomFactor[] = [0.9, 1, 1.1, 1.25]
+
 /**
  * 本机设置，存 localStorage：语言、主题、位置、朗读音色、深度思考与智能搜索开关、侧边栏收起状态。
  * API Key 在桌面端由系统加密存储（见 window.desktop），网页端仍存 localStorage。
@@ -32,6 +36,10 @@ type Settings = {
   siderCollapsed: boolean
   /** 桌面端关闭窗口时保留在托盘 */
   closeToTray: boolean
+  /** 生成超过 15 秒且窗口未聚焦时发送系统通知 */
+  notifyOnComplete: boolean
+  /** 主窗口界面缩放 */
+  zoomFactor: ZoomFactor
 }
 
 const KEYS = {
@@ -43,6 +51,8 @@ const KEYS = {
   thinking: 'chat-demo:thinking',
   search: 'chat-demo:search',
   siderCollapsed: 'chat-demo:sider-collapsed',
+  notifyOnComplete: 'chat-demo:notify-on-complete',
+  zoomFactor: 'chat-demo:zoom-factor',
 } as const
 
 /** Electron preload 注入的桌面桥接；纯网页环境返回 undefined */
@@ -125,6 +135,11 @@ const initialApiKey = (): string | null => {
 }
 
 /** 桌面端以主进程报告的状态为准；缺少状态时按未加密处理，避免谎称已加密 */
+const initialZoomFactor = (): ZoomFactor => {
+  const saved = Number(read(KEYS.zoomFactor))
+  return ZOOM_FACTORS.includes(saved as ZoomFactor) ? (saved as ZoomFactor) : 1
+}
+
 const initialApiKeyStorage = (): ApiKeyStorage => {
   const bridge = desktopBridge()
   if (!bridge) {
@@ -148,6 +163,8 @@ export const useSettings = create<Settings>(() => ({
   search: read(KEYS.search) === 'true',
   siderCollapsed: read(KEYS.siderCollapsed) === 'true',
   closeToTray: desktopBridge()?.desktopPrefs?.closeToTray === true,
+  notifyOnComplete: read(KEYS.notifyOnComplete) !== 'false',
+  zoomFactor: initialZoomFactor(),
 }))
 
 export const setLocale = (locale: Locale) => {
@@ -306,6 +323,36 @@ export const setSearch = (search: boolean) => {
 export const setSiderCollapsed = (siderCollapsed: boolean) => {
   write(KEYS.siderCollapsed, String(siderCollapsed))
   useSettings.setState({ siderCollapsed })
+}
+
+export const setNotifyOnComplete = (notifyOnComplete: boolean) => {
+  write(KEYS.notifyOnComplete, String(notifyOnComplete))
+  useSettings.setState({ notifyOnComplete })
+}
+
+const applyZoom = (zoomFactor: ZoomFactor) => {
+  const bridge = desktopBridge()
+  if (bridge && typeof bridge.setZoomFactor === 'function') {
+    void bridge.setZoomFactor(zoomFactor).then((ok) => {
+      if (!ok) {
+        useSettings.setState({ zoomFactor: 1 })
+      }
+    })
+  }
+}
+
+/** 启动时把已保存的缩放应用到主窗口 */
+export const applyZoomPreference = () => {
+  applyZoom(useSettings.getState().zoomFactor)
+}
+
+export const setZoomPreference = (zoomFactor: ZoomFactor) => {
+  if (!ZOOM_FACTORS.includes(zoomFactor)) {
+    return
+  }
+  write(KEYS.zoomFactor, String(zoomFactor))
+  useSettings.setState({ zoomFactor })
+  applyZoom(zoomFactor)
 }
 
 /** 关闭到托盘保存在主进程的 window-state.json，与窗口位置一起管理 */

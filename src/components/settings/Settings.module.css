@@ -67,6 +67,7 @@
   min-height: 0;
   margin-right: -24px;
   padding: 0 24px;
+  overflow-x: hidden;
   overflow-y: auto;
 }
 
@@ -92,7 +93,7 @@
 
 .text {
   display: flex;
-  flex: 1 0 0;
+  flex: 1 1 auto;
   flex-direction: column;
   gap: 4px;
   min-width: 0;
@@ -102,6 +103,7 @@
 .label {
   font-size: 14px;
   line-height: 22px;
+  white-space: nowrap;
 }
 
 .uploadButton {
@@ -154,8 +156,8 @@
 .themeOptions {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
-  margin: 8px 0 10px;
+  gap: 10px;
+  margin: 6px 0 8px;
 }
 
 .themeOption {
@@ -165,9 +167,9 @@
   align-items: center;
   justify-content: space-between;
   box-sizing: border-box;
-  min-width: 128px;
-  height: 82px;
-  padding: 21px 32px;
+  min-width: 112px;
+  height: 76px;
+  padding: 14px 18px;
   border: 1px solid var(--dsw-alias-border-l2);
   border-radius: 12px;
   background-color: transparent;
@@ -443,10 +445,13 @@
 
 .aboutBar {
   display: flex;
+  flex: 1 1 100%;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  margin-top: 8px;
+  box-sizing: border-box;
+  width: 100%;
+  margin-top: 0;
   padding: 12px 4px 0;
   border-top: 1px solid var(--dsw-alias-border-l1);
 }

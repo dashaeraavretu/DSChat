@@ -7,7 +7,7 @@ export type Notice = {
   /** 模板答复使用正文样式；其余统一为红色错误提示。 */
   presentation?: 'response'
   /** 需要用户处理的问题附带的操作 */
-  action?: 'apiKey' | 'topUp'
+  action?: 'apiKey' | 'topUp' | 'retry'
 }
 
 const getTemplateText = (reply: AssistantMessage) =>
@@ -29,7 +29,10 @@ export const describeReply = (reply: AssistantMessage): Notice | null => {
       return { text: message || translate('uploadFileStatusFailed') }
     }
     if (kind === 'network') {
-      return { text: translate('commonNetworkErrorToast') }
+      return { text: translate('commonNetworkErrorToast'), action: 'retry' }
+    }
+    if (kind === 'interrupted') {
+      return { text: translate('replyInterrupted'), action: 'retry' }
     }
     switch (classifyStatus(status)) {
       case 'unauthorized':

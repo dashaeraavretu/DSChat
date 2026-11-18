@@ -27,7 +27,7 @@ import { Tooltip } from '../base/Tooltip.js'
 import { ensureApiKey } from '../settings/settingsDialogState.js'
 import { DragMask, useFileDrop } from './DragMask.js'
 import { showToast } from '../base/toastState.js'
-import { ACCEPT, useUploads } from '../../services/attachments.js'
+import { ACCEPT, useUploads, validateFiles } from '../../services/attachments.js'
 import { DraftAttachments } from './DraftAttachments.js'
 import { useVoiceInput } from './useVoiceInput.js'
 import { VoiceButton } from './VoiceButton.js'
@@ -81,6 +81,12 @@ const Input = ({ sessionId }: { sessionId: string | null }) => {
     }
     if (!FEATURES.files) {
       showToast({ key: 'featureUnavailableFiles' })
+      return
+    }
+    // 选中/拖入/粘贴后先做数量、大小、类型预检，失败立即提示且不触发上传或 Key 检查
+    const precheck = validateFiles(files, getDraft(sessionId).attachments.length)
+    if (precheck) {
+      showToast(precheck)
       return
     }
     if (useChatStore.getState().importingHistory || !ensureApiKey()) {

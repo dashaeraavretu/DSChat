@@ -60,6 +60,15 @@ DSChat v1 aims to reproduce the official demo's feature set on the desktop:
 - Markdown, syntax highlighting, KaTeX math, and Mermaid diagrams.
 - Simplified Chinese and English, light and dark themes (including follow-system), mobile layouts, location settings, and chat history import and export.
 
+Added in 0.2.1:
+
+- Export a single conversation branch as Markdown from the session menu.
+- Optional completion notification after 15s when the window is unfocused.
+- Interface zoom (90/100/110/125%) persisted across launches.
+- Inline retry for interrupted/network replies and online/offline toasts.
+- Attachment count/size/type precheck before upload, with accurate 32/64 MB limits.
+- Native `Ctrl+K` search, `Ctrl+N` new chat, `Ctrl+,` settings and `Esc` close/stop.
+
 Added in 0.2.0:
 
 - Sidebar chat search across titles and message text, with native `Ctrl+K` / `Ctrl+N` shortcuts (150 ms debounce).

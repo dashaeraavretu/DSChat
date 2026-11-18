@@ -4,7 +4,7 @@ import { memo } from 'react'
 import { IconRefreshOutline16, IconWarningOutline16 } from '../base/icons.js'
 import { describeReply } from '../../services/chat/describe.js'
 import { canContinueReply } from '../../services/chat/reply.js'
-import { continueReply, regenerateReply } from '../../services/chat/store.js'
+import { continueReply, regenerateReply, retryReply } from '../../services/chat/store.js'
 import { stopReadAloud } from '../../services/speech/readAloud.js'
 import type { AssistantMessage as AssistantMessageType } from '../../services/chat/types.js'
 import { openSettings } from '../settings/settingsDialogState.js'
@@ -135,6 +135,18 @@ export const AssistantMessage = memo(function AssistantMessage({
                 >
                   {t('topUp')}
                 </a>
+              </>
+            ) : null}
+            {notice.action === 'retry' ? (
+              <>
+                {' '}
+                <button
+                  type="button"
+                  className={styles.noticeAction}
+                  onClick={() => retryReply(sessionId, message.id)}
+                >
+                  {t('retryThisReply')}
+                </button>
               </>
             ) : null}
           </span>

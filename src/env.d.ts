@@ -41,8 +41,14 @@ interface DesktopBridge {
   getKeyStorage(): Promise<DesktopKeyStorage>
   /** 更新关闭到托盘偏好 */
   setCloseToTray(enabled: boolean): Promise<boolean>
+  /** 应用主窗口缩放（0.9–1.25） */
+  setZoomFactor(factor: number): Promise<boolean>
+  /** 弹出保存对话框写入文本文件（用于 Markdown 导出） */
+  saveTextFile(payload: { content: string; defaultName: string }): Promise<boolean>
+  /** 生成完成通知；主进程会再次检查窗口焦点 */
+  notifyGenerationDone(payload: { title: string; body: string }): Promise<boolean>
   /** 订阅原生菜单/托盘命令，返回取消订阅函数 */
-  onCommand(callback: (command: 'new-chat' | 'search') => void): () => void
+  onCommand(callback: (command: 'new-chat' | 'search' | 'settings' | 'escape') => void): () => void
   /** 导出脱敏诊断日志；info 为构建期端点/模型等信息 */
   exportDiagnostics(info: {
     version: string

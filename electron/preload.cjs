@@ -83,6 +83,47 @@ contextBridge.exposeInMainWorld('desktop', {
       return { encryptionAvailable: false, mode: 'plaintext' }
     }
   },
+  async setZoomFactor(factor) {
+    if (typeof factor !== 'number' || !Number.isFinite(factor)) return false
+    try {
+      return (await ipcRenderer.invoke('window:set-zoom-factor', factor)) === true
+    } catch (error) {
+      console.error('[preload] 设置缩放失败：', error)
+      return false
+    }
+  },
+  async saveTextFile(payload) {
+    if (!payload || typeof payload.content !== 'string' || typeof payload.defaultName !== 'string') {
+      return false
+    }
+    try {
+      return (
+        (await ipcRenderer.invoke('file:save-text', {
+          content: payload.content,
+          defaultName: payload.defaultName,
+        })) === true
+      )
+    } catch (error) {
+      console.error('[preload] 保存文件失败：', error)
+      return false
+    }
+  },
+  async notifyGenerationDone(payload) {
+    if (!payload || typeof payload.title !== 'string' || typeof payload.body !== 'string') {
+      return false
+    }
+    try {
+      return (
+        (await ipcRenderer.invoke('app:notify-done', {
+          title: payload.title.slice(0, 200),
+          body: payload.body.slice(0, 500),
+        })) === true
+      )
+    } catch (error) {
+      console.error('[preload] 发送完成通知失败：', error)
+      return false
+    }
+  },
   async setCloseToTray(enabled) {
     try {
       return (await ipcRenderer.invoke('desktop:set-close-to-tray', enabled === true)) === true
@@ -94,7 +135,12 @@ contextBridge.exposeInMainWorld('desktop', {
   onCommand(callback) {
     if (typeof callback !== 'function') return () => {}
     const listener = (_event, command) => {
-      if (command === 'new-chat' || command === 'search') {
+      if (
+        command === 'new-chat' ||
+        command === 'search' ||
+        command === 'settings' ||
+        command === 'escape'
+      ) {
         callback(command)
       }
     }

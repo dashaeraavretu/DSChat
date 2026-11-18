@@ -1,6 +1,6 @@
 {
   "name": "dschat",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "DSChat：基于 DeepSeek 开源 chat-demo 的跨平台桌面聊天客户端。",
   "license": "MIT",
   "author": "DSChat contributors",
@@ -18,7 +18,7 @@
     "smoke:blob": "electron . --smoke-blob",
     "icon": "node scripts/generate-icon.mjs",
     "dist:win": "pnpm build && electron-builder --win",
-    "dist:test": "rimraf release-test && pnpm build:test && electron-builder --win --config.directories.output=release-test --config.win.artifactName=DSChat-0.2.0-qianji-test-x64.exe",
+    "dist:test": "rimraf release-test && pnpm build:test && electron-builder --win --config.directories.output=release-test --config.win.artifactName=DSChat-0.2.1-qianji-test-x64.exe",
     "dist:dir": "pnpm build && electron-builder --win --dir",
     "type": "tsc -p tsconfig.json",
     "lint": "oxlint src rspack.config.ts",

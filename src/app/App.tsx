@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { useTranslate } from '../i18n/index.js'
 import {
+  applyZoomPreference,
   isDesktopApp,
   migrateLegacyApiKey,
   setSiderCollapsed,
@@ -13,6 +14,7 @@ import {
   newChat,
   retrySaveSessions,
   selectSession,
+  stopReply,
   useChatStore,
 } from '../services/chat/store.js'
 import { SearchPanel } from '../components/search/SearchPanel.js'
@@ -20,15 +22,25 @@ import { closeSearchPanel } from '../components/search/searchPanelState.js'
 import { SessionView } from '../components/session/SessionView.js'
 import { MobileHeader } from '../components/session/MobileHeader.js'
 import { Welcome } from '../components/session/Welcome.js'
-import { ensureApiKey } from '../components/settings/settingsDialogState.js'
+import {
+  closeSettings,
+  ensureApiKey,
+  openSettings,
+  useSettingsDialog,
+} from '../components/settings/settingsDialogState.js'
 import { SettingsDialog } from '../components/settings/SettingsDialog.js'
+import { hasOpenModal } from '../components/base/Modal.js'
 import { Toast } from '../components/base/Toast.js'
 import { showToast } from '../components/base/toastState.js'
 import { onUploadNotice } from '../services/attachments.js'
 import { Button } from '../components/base/Button.js'
 import { stopReadAloud } from '../services/speech/readAloud.js'
 import { CollapsedSider } from '../components/sider/CollapsedSider.js'
-import { closeMobileSider, openMobileSider } from '../components/sider/mobileSiderState.js'
+import {
+  closeMobileSider,
+  openMobileSider,
+  useMobileSider,
+} from '../components/sider/mobileSiderState.js'
 import { requestSearchFocus } from '../components/sider/searchFocusState.js'
 import { MobileSider, Sider } from '../components/sider/Sider.js'
 import styles from './App.module.css'
@@ -85,7 +97,7 @@ export const App = () => {
     }
   }, [])
 
-  // 原生菜单 / 托盘命令（Ctrl+N 新建，Ctrl+K 搜索）
+  // 原生菜单 / 托盘命令（Ctrl+N 新建，Ctrl+K 搜索，Ctrl+, 设置，Esc 关闭/停止）
   useEffect(() => {
     const bridge = window.desktop
     if (!bridge?.onCommand) {
@@ -101,9 +113,55 @@ export const App = () => {
           openMobileSider()
         }
         requestSearchFocus()
+      } else if (command === 'settings') {
+        openSettings('general')
+      } else if (command === 'escape') {
+        const hadModal = hasOpenModal()
+        const hadMenu = Boolean(document.querySelector('[role="menu"]'))
+        const active = document.activeElement
+        const target = active instanceof HTMLElement ? active : document.body
+        const event = new KeyboardEvent('keydown', {
+          key: 'Escape',
+          code: 'Escape',
+          bubbles: true,
+          cancelable: true,
+        })
+        // 让现有弹窗/菜单/输入框先按原语义处理 Esc
+        target.dispatchEvent(event)
+        if (hadModal || hadMenu) {
+          return
+        }
+        if (useSettingsDialog.getState().open) {
+          closeSettings()
+          return
+        }
+        if (useMobileSider.getState().open) {
+          closeMobileSider()
+          return
+        }
+        const { activeId, streaming } = useChatStore.getState()
+        if (activeId !== null && Object.hasOwn(streaming, activeId)) {
+          stopReply(activeId)
+        }
       }
     })
   }, [isMobile])
+
+  useEffect(() => {
+    applyZoomPreference()
+  }, [])
+
+  // 断网/恢复只提示，不自动重连
+  useEffect(() => {
+    const online = () => showToast({ key: 'networkOnline' })
+    const offline = () => showToast({ key: 'networkOffline', type: 'error' })
+    window.addEventListener('online', online)
+    window.addEventListener('offline', offline)
+    return () => {
+      window.removeEventListener('online', online)
+      window.removeEventListener('offline', offline)
+    }
+  }, [])
 
   return (
     <>
