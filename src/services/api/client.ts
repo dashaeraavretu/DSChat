@@ -1,4 +1,5 @@
 import { translate, type TranslationMessage } from '../../i18n/index.js'
+import { API_MODEL, FEATURES, MESSAGES_BASE, MODELS_URL, VERIFY_MODE } from '../buildInfo.js'
 import { readMessageEvent } from './parseEvent.js'
 import { readServerSentEvents } from './sse.js'
 import type {
@@ -9,10 +10,10 @@ import type {
   MessageStreamEvent,
 } from './types.js'
 
-/** 构建期 API 地址，默认 https://api.deepseek.com；本地开发支持开发服务器代理 */
-export const API_ORIGIN = __API_ORIGIN__
+/** 构建期服务配置；默认官方地址与 0.1.3 完全一致 */
+export { API_ORIGIN } from '../buildInfo.js'
 /** Anthropic 兼容接口的前缀 */
-const ANTHROPIC_BASE_URL = `${API_ORIGIN}/anthropic/v1`
+const ANTHROPIC_BASE_URL = MESSAGES_BASE
 /** 引用 Files API 上传的图片、调用 Anthropic 兼容 Files API 时必须携带 */
 const FILES_BETA = 'files-api-2025-04-14'
 
@@ -89,9 +90,44 @@ const anthropicHeaders = (apiKey: string, beta: boolean): Record<string, string>
   ...(beta ? { 'anthropic-beta': FILES_BETA } : {}),
 })
 
-/** 用 GET /models 校验 API Key（不产生费用） */
+/**
+ * 校验 API Key。默认仍用 GET /models（不产生费用）；
+ * 测试 provider 可改为 1-token POST 或跳过，并区分不可达 / 401 / 模型不存在。
+ */
 export const verifyApiKey = async (apiKey: string, signal?: AbortSignal): Promise<void> => {
-  await request(`${API_ORIGIN}/models`, {
+  if (VERIFY_MODE === 'skip') {
+    return
+  }
+  if (VERIFY_MODE === 'message') {
+    try {
+      await request(`${ANTHROPIC_BASE_URL}/messages`, {
+        method: 'POST',
+        headers: {
+          ...anthropicHeaders(apiKey, false),
+          Authorization: `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: API_MODEL,
+          max_tokens: 1,
+          messages: [{ role: 'user', content: 'ping' }],
+        }),
+        signal,
+      })
+    } catch (error) {
+      if (
+        error instanceof ApiError &&
+        (error.status === 404 ||
+          /model/i.test(error.message) &&
+            /(not found|not exist|unsupported|invalid|unknown)/i.test(error.message))
+      ) {
+        throw new ApiError('http', { key: 'apiKeyModelUnavailable' }, error.status)
+      }
+      throw error
+    }
+    return
+  }
+  await request(MODELS_URL, {
     method: 'GET',
     headers: { Authorization: `Bearer ${apiKey}` },
     signal,
@@ -108,6 +144,9 @@ export const uploadFile = async (
   purpose: FilePurpose | null,
   signal?: AbortSignal
 ): Promise<FileObject> => {
+  if (!FEATURES.files) {
+    throw new ApiError('http', { key: 'featureUnavailableFiles' })
+  }
   const form = new FormData()
   if (purpose) {
     form.append('purpose', purpose)
@@ -124,6 +163,9 @@ export const uploadFile = async (
 
 /** DELETE /anthropic/v1/files/{file_id} */
 export const deleteFile = async (apiKey: string, fileId: string): Promise<void> => {
+  if (!FEATURES.files) {
+    throw new ApiError('http', { key: 'featureUnavailableFiles' })
+  }
   await request(`${ANTHROPIC_BASE_URL}/files/${encodeURIComponent(fileId)}`, {
     method: 'DELETE',
     headers: anthropicHeaders(apiKey, true),

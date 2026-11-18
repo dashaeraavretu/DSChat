@@ -16,18 +16,93 @@ const cssLoader = {
   options: { targets },
 }
 
+type FeatureFlags = { files: boolean; speech: boolean; webTools: boolean }
+type VerifyMode = 'models' | 'message' | 'skip'
+type Provider = {
+  origin: string
+  messagesBase: string
+  modelsUrl: string
+  model: string
+  features: FeatureFlags
+  verifyMode: VerifyMode
+}
+
 type ConfigOptions = {
-  /** 公开 API 的地址，注入为 __API_ORIGIN__ */
+  /** 公开 API 的地址；未设置时使用 provider 配置 */
   apiOrigin?: string
   /** 开发服务器配置，支持本地接口代理 */
   devServer?: Configuration['devServer']
+  /** 构建期 provider；未设置时从 DSCHAT_* 环境变量解析 */
+  provider?: Provider
+}
+
+const joinUrl = (origin: string, pathname: string) =>
+  /^https?:\/\//i.test(pathname)
+    ? pathname
+    : `${origin.replace(/\/+$/, '')}/${pathname.replace(/^\/+/, '')}`
+
+const envFlag = (name: string, fallback: boolean) => {
+  const value = process.env[name]?.trim().toLowerCase()
+  if (!value) {
+    return fallback
+  }
+  return !['0', 'false', 'off', 'no'].includes(value)
+}
+
+/**
+ * 构建期 provider 配置。默认值必须与 0.1.3 完全一致；
+ * DSCHAT_PROFILE=qianji 或显式 DSCHAT_* 变量用于测试构建，不影响默认发布。
+ */
+const resolveProvider = (): Provider => {
+  const profile = process.env.DSCHAT_PROFILE?.trim().toLowerCase()
+  const qianji = profile === 'qianji'
+  const origin = (
+    process.env.DSCHAT_API_ORIGIN?.trim() ||
+    (qianji ? 'https://dygpt.duoyioa.com/qianji' : 'https://api.deepseek.com')
+  ).replace(/\/+$/, '')
+  const messagesPath =
+    process.env.DSCHAT_MESSAGES_PATH?.trim() || (qianji ? '/v1' : '/anthropic/v1')
+  const modelsPath =
+    process.env.DSCHAT_MODELS_PATH?.trim() || (qianji ? '/v1/models' : '/models')
+  const model =
+    process.env.DSCHAT_MODEL?.trim() || (qianji ? 'DS/DeepSeek-V4.1-Flash' : 'deepseek-flash')
+  const verifyMode =
+    (process.env.DSCHAT_VERIFY_MODE?.trim() as VerifyMode | undefined) ||
+    (qianji ? 'message' : 'models')
+
+  return {
+    origin,
+    messagesBase: joinUrl(origin, messagesPath),
+    modelsUrl: joinUrl(origin, modelsPath),
+    model,
+    verifyMode:
+      verifyMode === 'message' || verifyMode === 'skip' || verifyMode === 'models'
+        ? verifyMode
+        : 'models',
+    features: qianji
+      ? { files: false, speech: false, webTools: false }
+      : {
+          files: envFlag('DSCHAT_FEATURE_FILES', true),
+          speech: envFlag('DSCHAT_FEATURE_SPEECH', true),
+          webTools: envFlag('DSCHAT_FEATURE_WEB_TOOLS', true),
+        },
+  }
 }
 
 /** 创建构建配置，支持自定义 API 地址和开发服务器选项 */
 export const createConfig = ({
-  apiOrigin = 'https://api.deepseek.com',
+  apiOrigin,
   devServer,
-}: ConfigOptions = {}): Configuration => ({
+  provider = resolveProvider(),
+}: ConfigOptions = {}): Configuration => {
+  const origin = apiOrigin?.replace(/\/+$/, '') || provider.origin
+  // 显式覆盖 apiOrigin 时才重新拼路径；默认/DSCHAT_PROFILE 直接使用 provider 的完整地址
+  const messagesBase = apiOrigin
+    ? joinUrl(origin, new URL(provider.messagesBase).pathname)
+    : provider.messagesBase
+  const modelsUrl = apiOrigin ? joinUrl(origin, new URL(provider.modelsUrl).pathname) : provider.modelsUrl
+
+  return {
   mode: dev ? 'development' : 'production',
   entry: './src/main.tsx',
   output: {
@@ -80,18 +155,23 @@ export const createConfig = ({
       scriptLoading: 'defer',
       meta: { 'application-version': version },
     }),
-    new rspack.DefinePlugin({ __API_ORIGIN__: JSON.stringify(apiOrigin) }),
+    new rspack.DefinePlugin({
+      __APP_VERSION__: JSON.stringify(version),
+      __API_ORIGIN__: JSON.stringify(origin),
+      __MESSAGES_BASE__: JSON.stringify(messagesBase),
+      __MODELS_URL__: JSON.stringify(modelsUrl),
+      __API_MODEL__: JSON.stringify(provider.model),
+      __FEATURES__: JSON.stringify(provider.features),
+      __VERIFY_MODE__: JSON.stringify(provider.verifyMode),
+    }),
     new rspack.CopyRspackPlugin({
       patterns: [{ from: path.resolve(root, 'LICENSE'), to: 'LICENSE', toType: 'file' }],
     }),
   ],
   performance: { hints: false },
   devServer: { port: 8090, ...devServer },
-})
-
-// 构建期可用 DSCHAT_API_ORIGIN 覆盖 API 地址，例如指向本地代理；
-// 未设置时保持官方地址。
-const apiOrigin = process.env.DSCHAT_API_ORIGIN?.trim() || 'https://api.deepseek.com'
+  }
+}
 
 // eslint-disable-next-line import/no-default-export
-export default defineConfig(createConfig({ apiOrigin }))
+export default defineConfig(createConfig())

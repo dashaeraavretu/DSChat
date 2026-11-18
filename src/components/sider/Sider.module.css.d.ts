@@ -17,6 +17,14 @@ declare const styles: {
   readonly "drawer": string;
   readonly "drawerMask": string;
   readonly "mobile": string;
+  readonly "searchWrap": string;
+  readonly "searchInput": string;
+  readonly "searchResults": string;
+  readonly "searchCount": string;
+  readonly "searchEmpty": string;
+  readonly "searchResult": string;
+  readonly "searchResultTitle": string;
+  readonly "searchResultSnippet": string;
 };
 export = styles;
 

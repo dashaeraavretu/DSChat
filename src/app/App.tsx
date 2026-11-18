@@ -1,10 +1,16 @@
 import { useEffect } from 'react'
 import { useTranslate } from '../i18n/index.js'
-import { isDesktopApp, migrateLegacyApiKey, useSettings } from '../services/settings.js'
+import {
+  isDesktopApp,
+  migrateLegacyApiKey,
+  setSiderCollapsed,
+  useSettings,
+} from '../services/settings.js'
 import { useIsMobile, useMobileViewport, usePreventPageScroll } from './viewport.js'
 import {
   bindChatPersistence,
   initChat,
+  newChat,
   retrySaveSessions,
   selectSession,
   useChatStore,
@@ -22,7 +28,8 @@ import { onUploadNotice } from '../services/attachments.js'
 import { Button } from '../components/base/Button.js'
 import { stopReadAloud } from '../services/speech/readAloud.js'
 import { CollapsedSider } from '../components/sider/CollapsedSider.js'
-import { closeMobileSider } from '../components/sider/mobileSiderState.js'
+import { closeMobileSider, openMobileSider } from '../components/sider/mobileSiderState.js'
+import { requestSearchFocus } from '../components/sider/searchFocusState.js'
 import { MobileSider, Sider } from '../components/sider/Sider.js'
 import styles from './App.module.css'
 
@@ -77,6 +84,26 @@ export const App = () => {
       ensureApiKey()
     }
   }, [])
+
+  // 原生菜单 / 托盘命令（Ctrl+N 新建，Ctrl+K 搜索）
+  useEffect(() => {
+    const bridge = window.desktop
+    if (!bridge?.onCommand) {
+      return
+    }
+    return bridge.onCommand((command) => {
+      if (command === 'new-chat') {
+        newChat()
+        closeMobileSider()
+      } else if (command === 'search') {
+        setSiderCollapsed(false)
+        if (isMobile) {
+          openMobileSider()
+        }
+        requestSearchFocus()
+      }
+    })
+  }, [isMobile])
 
   return (
     <>

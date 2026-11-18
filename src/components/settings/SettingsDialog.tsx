@@ -21,6 +21,8 @@ import { regionCodes, getRegionName, provinces } from '../../services/location.j
 import {
   clearApiKey,
   isChineseBrowser,
+  isDesktopApp,
+  setCloseToTray,
   setLocale,
   setLocation,
   setThemePreference,
@@ -28,6 +30,12 @@ import {
   useSettings,
   type ThemePreference,
 } from '../../services/settings.js'
+import {
+  API_MODEL,
+  API_ORIGIN,
+  APP_VERSION,
+  FEATURES,
+} from '../../services/buildInfo.js'
 import { useTranslate, type TranslationKey, type TranslationMessage } from '../../i18n/index.js'
 import { Button } from '../base/Button.js'
 import { Modal } from '../base/Modal.js'
@@ -60,6 +68,7 @@ const SettingsContent = () => {
   const isMobile = useIsMobile()
   // 打开时按调用方指定的分组选中，之后在弹窗内切换
   const [section, setSection] = useState(() => useSettingsDialog.getState().section)
+  const [aboutOpen, setAboutOpen] = useState(false)
   // 切换分组不丢失正在输入的 API Key 与导入状态
   const apiKeyEditor = useApiKeyEditor()
   const clearKey = useClearKey()
@@ -102,6 +111,7 @@ const SettingsContent = () => {
               <LocaleSetting />
               <TtsVoiceSetting />
               <LocationSetting />
+              <CloseToTraySetting />
             </>
           ) : (
             <>
@@ -144,10 +154,19 @@ const SettingsContent = () => {
             </>
           )}
         </div>
+        <div className={styles.aboutBar}>
+          <span className={styles.aboutText}>
+            {`DSChat v${APP_VERSION} · ${API_ORIGIN} · ${API_MODEL}`}
+          </span>
+          <button type="button" className={styles.aboutLink} onClick={() => setAboutOpen(true)}>
+            {t('about')}
+          </button>
+        </div>
       </Modal>
       {historyImport.file ? <ImportConfirm historyImport={historyImport} /> : null}
       {historyDelete.opened ? <DeleteAllConfirm historyDelete={historyDelete} /> : null}
       {clearKey.opened ? <ClearKeyConfirm clearKey={clearKey} /> : null}
+      {aboutOpen ? <AboutDialog onClose={() => setAboutOpen(false)} /> : null}
     </>
   )
 }
@@ -496,6 +515,120 @@ const errorStatus = (key: TranslationKey, error: unknown): Status => ({
     : { params: { message: error instanceof Error ? error.message : String(error) } }),
   error: true,
 })
+
+const CloseToTraySetting = () => {
+  const t = useTranslate()
+  const closeToTray = useSettings((state) => state.closeToTray)
+  const desktop = isDesktopApp()
+  return (
+    <SettingCell
+      label={t('settingsCloseToTray')}
+      description={desktop ? t('settingsCloseToTrayDescription') : t('settingsCloseToTrayDesktopOnly')}
+      status={null}
+      action={
+        <button
+          type="button"
+          role="switch"
+          aria-checked={closeToTray}
+          aria-label={t('settingsCloseToTray')}
+          className={clsx(styles.switch, closeToTray && styles.switchOn)}
+          disabled={!desktop}
+          onClick={() => setCloseToTray(!closeToTray)}
+        >
+          <span className={styles.switchThumb} />
+        </button>
+      }
+    />
+  )
+}
+
+const AboutDialog = ({ onClose }: { onClose: () => void }) => {
+  const t = useTranslate()
+  const [exporting, setExporting] = useState(false)
+  const bridge = window.desktop
+  const featureLabels = [
+    FEATURES.files ? t('aboutFeatureFiles') : null,
+    FEATURES.speech ? t('aboutFeatureSpeech') : null,
+    FEATURES.webTools ? t('aboutFeatureWebTools') : null,
+  ].filter(Boolean)
+  const disabledLabels = [
+    !FEATURES.files ? t('aboutFeatureFiles') : null,
+    !FEATURES.speech ? t('aboutFeatureSpeech') : null,
+    !FEATURES.webTools ? t('aboutFeatureWebTools') : null,
+  ].filter(Boolean)
+
+  const exportLogs = async () => {
+    if (!bridge?.exportDiagnostics) {
+      showToast({ key: 'diagnosticsExportFailed', type: 'error' })
+      return
+    }
+    setExporting(true)
+    try {
+      const ok = await bridge.exportDiagnostics({
+        version: APP_VERSION,
+        apiOrigin: API_ORIGIN,
+        model: API_MODEL,
+        features: FEATURES,
+      })
+      showToast(
+        ok
+          ? { key: 'diagnosticsExported' }
+          : { key: 'diagnosticsExportFailed', type: 'error' }
+      )
+    } finally {
+      setExporting(false)
+    }
+  }
+
+  return (
+    <Modal
+      title={t('aboutTitle')}
+      className={styles.aboutDialog}
+      onClose={onClose}
+      footer={
+        <div className={styles.deleteActions}>
+          <Button variant="outlined" onClick={onClose}>
+            {t('close')}
+          </Button>
+          <Button
+            variant="primary"
+            disabled={exporting || !bridge?.exportDiagnostics}
+            onClick={() => void exportLogs()}
+          >
+            {t(exporting ? 'diagnosticsExporting' : 'diagnosticsExport')}
+          </Button>
+        </div>
+      }
+    >
+      <div className={styles.aboutRows}>
+        <div className={styles.aboutRow}>
+          <span className={styles.aboutLabel}>{t('aboutVersion')}</span>
+          <span className={styles.aboutValue}>{APP_VERSION}</span>
+        </div>
+        <div className={styles.aboutRow}>
+          <span className={styles.aboutLabel}>{t('aboutEndpoint')}</span>
+          <span className={styles.aboutValue}>{API_ORIGIN}</span>
+        </div>
+        <div className={styles.aboutRow}>
+          <span className={styles.aboutLabel}>{t('aboutModel')}</span>
+          <span className={styles.aboutValue}>{API_MODEL}</span>
+        </div>
+        <div className={styles.aboutRow}>
+          <span className={styles.aboutLabel}>{t('aboutFeatures')}</span>
+          <span className={styles.aboutValue}>
+            {featureLabels.length > 0 ? featureLabels.join(' / ') : t('aboutNone')}
+          </span>
+        </div>
+      </div>
+      {disabledLabels.length > 0 ? (
+        <div className={styles.aboutWarning}>
+          {t('aboutTestBuildWarning', { features: disabledLabels.join(' / ') })}
+        </div>
+      ) : null}
+      <div className={styles.aboutDescription}>{t('diagnosticsDescription')}</div>
+    </Modal>
+  )
+}
 
 const SettingCell = ({
   label,

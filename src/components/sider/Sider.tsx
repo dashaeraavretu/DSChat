@@ -1,10 +1,16 @@
 import clsx from 'clsx'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslate } from '../../i18n/index.js'
 import { IconPanelLeftOutline16, IconSettingsOutline16, NewChatIcon } from '../base/icons.js'
 import { setSiderCollapsed } from '../../services/settings.js'
 import { groupSessions } from '../../services/chat/sessionGroups.js'
-import { newChat, removeSession, useChatStore } from '../../services/chat/store.js'
+import { searchSessions, type SessionSearchResult } from '../../services/chat/search.js'
+import {
+  newChat,
+  removeSession,
+  selectSession,
+  useChatStore,
+} from '../../services/chat/store.js'
 import type { SessionSummary } from '../../services/chat/types.js'
 import { Button } from '../base/Button.js'
 import { IconButton } from '../base/IconButton.js'
@@ -12,6 +18,7 @@ import { Modal } from '../base/Modal.js'
 import { showToast } from '../base/toastState.js'
 import { openSettings } from '../settings/settingsDialogState.js'
 import { closeMobileSider, useMobileSider } from './mobileSiderState.js'
+import { useSearchFocus } from './searchFocusState.js'
 import { SessionItem } from './SessionItem.js'
 import styles from './Sider.module.css'
 
@@ -24,6 +31,48 @@ export const Sider = ({ mobile = false }: { mobile?: boolean }) => {
   const groups = useMemo(() => groupSessions(sessions, now, t), [sessions, now, t])
   const [deleting, setDeleting] = useState<SessionSummary | null>(null)
   const [deletePending, setDeletePending] = useState(false)
+  const [query, setQuery] = useState('')
+  const [results, setResults] = useState<SessionSearchResult[]>([])
+  const [searching, setSearching] = useState(false)
+  const searchRef = useRef<HTMLInputElement>(null)
+  const focusToken = useSearchFocus((state) => state.token)
+
+  useEffect(() => {
+    if (focusToken > 0) {
+      searchRef.current?.focus()
+    }
+  }, [focusToken])
+
+  // 150ms 节流后再查 IndexedDB，避免每个按键都读取全部会话
+  useEffect(() => {
+    const needle = query.trim()
+    if (!needle) {
+      setResults([])
+      setSearching(false)
+      return
+    }
+    let cancelled = false
+    setSearching(true)
+    const timer = setTimeout(() => {
+      void searchSessions(needle)
+        .then((found) => {
+          if (!cancelled) {
+            setResults(found)
+            setSearching(false)
+          }
+        })
+        .catch(() => {
+          if (!cancelled) {
+            setResults([])
+            setSearching(false)
+          }
+        })
+    }, 150)
+    return () => {
+      cancelled = true
+      clearTimeout(timer)
+    }
+  }, [query])
 
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout>
@@ -74,22 +123,71 @@ export const Sider = ({ mobile = false }: { mobile?: boolean }) => {
         </span>
         {t('newChat')}
       </button>
+      <div className={styles.searchWrap}>
+        <input
+          ref={searchRef}
+          type="search"
+          className={styles.searchInput}
+          placeholder={t('searchSessionsPlaceholder')}
+          aria-label={t('searchSessionsPlaceholder')}
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === 'Escape') {
+              setQuery('')
+              event.currentTarget.blur()
+            }
+          }}
+        />
+      </div>
       <div className={styles.listWrap}>
-        <div className={styles.list}>
-          {groups.map((group) => (
-            <div key={group.key} className={styles.section}>
-              <div className={styles.sectionHeader}>{group.label}</div>
-              {group.sessions.map((session) => (
-                <SessionItem
-                  key={session.id}
-                  session={session}
-                  active={session.id === activeId}
-                  onDelete={() => setDeleting(session)}
-                />
-              ))}
-            </div>
-          ))}
-        </div>
+        {query.trim() ? (
+          <div className={styles.searchResults}>
+            {searching ? (
+              <div className={styles.searchEmpty}>{t('searchSearching')}</div>
+            ) : results.length > 0 ? (
+              <>
+                <div className={styles.searchCount}>
+                  {t('searchResultCount', { count: results.length })}
+                </div>
+                {results.map((result) => (
+                  <button
+                    key={result.session.id}
+                    type="button"
+                    className={styles.searchResult}
+                    onClick={() => {
+                      selectSession(result.session.id)
+                      closeMobileSider()
+                    }}
+                  >
+                    <span className={styles.searchResultTitle}>
+                      {result.session.title || t('newChat')}
+                    </span>
+                    <span className={styles.searchResultSnippet}>{result.snippet}</span>
+                  </button>
+                ))}
+              </>
+            ) : (
+              <div className={styles.searchEmpty}>{t('searchNoResults')}</div>
+            )}
+          </div>
+        ) : (
+          <div className={styles.list}>
+            {groups.map((group) => (
+              <div key={group.key} className={styles.section}>
+                <div className={styles.sectionHeader}>{group.label}</div>
+                {group.sessions.map((session) => (
+                  <SessionItem
+                    key={session.id}
+                    session={session}
+                    active={session.id === activeId}
+                    onDelete={() => setDeleting(session)}
+                  />
+                ))}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
       <div className={styles.bottom}>
         <button type="button" className={styles.settings} onClick={() => openSettings('general')}>

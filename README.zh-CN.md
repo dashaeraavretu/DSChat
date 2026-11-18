@@ -36,6 +36,7 @@ pnpm smoke        # 启动已构建应用，页面加载完成后退出
 pnpm smoke:blob   # 验证附件 blob: 预览窗口
 pnpm dist:dir     # 生成免安装的 release/win-unpacked
 pnpm dist:win     # 生成 Windows 安装包
+pnpm dist:test    # 生成千机测试包到 release-test/（不对外分发）
 ```
 
 `pnpm build` 产出 `dist/` 下的网页资源；打包命令使用 electron-builder，产物写入 `release/`（见 [package.json](package.json) 的 `build.directories.output`）。
@@ -59,6 +60,13 @@ DSChat v1 在桌面端复刻官方 demo 的功能：
 - 附件上传、粘贴与拖拽；语音输入与回复朗读。移动端录音时，输入框首行显示实时频谱。
 - Markdown、代码高亮、KaTeX 公式与 Mermaid 图表。
 - 简体中文与英文、浅色与深色主题（含跟随系统）、移动端布局、位置设置、历史导入导出。
+
+0.2.0 新增：
+
+- 侧栏会话搜索，匹配标题与正文；原生 `Ctrl+K` 搜索、`Ctrl+N` 新建，150ms 节流。
+- 每条回复的元信息：时间、输入/缓存/输出 Token、耗时（窄屏隐藏）。
+- 窗口位置/大小记忆与多显示器越界回退；托盘菜单（显示/隐藏、新建、退出）；可选关闭到托盘与首次关闭提示。
+- 关于页展示版本、API 端点、模型与可用功能；支持导出脱敏诊断日志（附操作系统与 Electron 版本）。
 
 逐项功能清单（含桌面端预期行为、验证步骤和服务端依赖）见 [docs/FEATURE-PARITY.md](docs/FEATURE-PARITY.md)；手动验收清单见 [docs/QA-CHECKLIST.md](docs/QA-CHECKLIST.md)。
 
@@ -101,6 +109,7 @@ $env:DSCHAT_API_ORIGIN = "https://api.example.com"; pnpm build
 | `pnpm smoke:blob`       | 验证附件 blob: 预览窗口                |
 | `pnpm dist:dir`         | 打包免安装桌面应用到 `release/`        |
 | `pnpm dist:win`         | 打包 Windows 安装包到 `release/`       |
+| `pnpm dist:test`        | 打包千机测试包到 `release-test/`       |
 | `pnpm type`             | TypeScript 类型检查                    |
 | `pnpm lint`             | oxlint 检查                            |
 | `pnpm format`           | oxfmt 格式化                           |

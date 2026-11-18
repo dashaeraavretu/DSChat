@@ -137,3 +137,20 @@
     --search-row-site-logo-color: var(--dsw-alias-interactive-bg-hover);
   }
 }
+
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding-top: 6px;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 11px;
+  line-height: 16px;
+  user-select: none;
+}
+
+@media (max-width: 767px) {
+  .meta {
+    display: none;
+  }
+}

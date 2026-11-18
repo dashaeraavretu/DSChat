@@ -8,6 +8,7 @@ import { continueReply, regenerateReply } from '../../services/chat/store.js'
 import { stopReadAloud } from '../../services/speech/readAloud.js'
 import type { AssistantMessage as AssistantMessageType } from '../../services/chat/types.js'
 import { openSettings } from '../settings/settingsDialogState.js'
+import { useSettings } from '../../services/settings.js'
 import { IconButton } from '../base/IconButton.js'
 import { Button } from '../base/Button.js'
 import { Markdown } from '../markdown/Markdown.js'
@@ -44,6 +45,7 @@ export const AssistantMessage = memo(function AssistantMessage({
   onSelectVersion: SelectMessageVersion
 }) {
   const t = useTranslate()
+  const locale = useSettings((state) => state.locale)
   const view = useReplyView(message, streaming)
   const panelEntry = useSearchPanel((state) => state.entry)
   const notice = streaming ? null : describeReply(message)
@@ -56,6 +58,20 @@ export const AssistantMessage = memo(function AssistantMessage({
   const copyText = responseText || notice?.text
   const waiting = streaming && view.steps.length === 0 && !view.answer && !message.thinking
   const summaryEntry = `${message.id}-summary`
+  const usage = message.usage
+  const cacheTokens = usage
+    ? (usage.cache_creation_input_tokens ?? 0) + (usage.cache_read_input_tokens ?? 0)
+    : 0
+  const duration =
+    message.completedAt && message.completedAt >= message.createdAt
+      ? (message.completedAt - message.createdAt) / 1000
+      : null
+  const timeText = new Intl.DateTimeFormat(locale, {
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(message.createdAt)
   return (
     <div className={styles.message}>
       {refused ? null : (
@@ -136,6 +152,23 @@ export const AssistantMessage = memo(function AssistantMessage({
               { count: view.searchResults.length }
             )}
           </span>
+        </div>
+      ) : null}
+      {!streaming ? (
+        <div className={styles.meta}>
+          <span>{timeText}</span>
+          {usage ? (
+            <span>
+              {t('messageMetaTokens', {
+                input: usage.input_tokens,
+                cache: cacheTokens,
+                output: usage.output_tokens,
+              })}
+            </span>
+          ) : null}
+          {duration !== null ? (
+            <span>{t('messageMetaDuration', { seconds: duration.toFixed(1) })}</span>
+          ) : null}
         </div>
       ) : null}
       {streaming ? null : (

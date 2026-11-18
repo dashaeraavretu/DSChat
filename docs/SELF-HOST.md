@@ -63,6 +63,27 @@ pnpm smoke
 
 它会加载构建产物，在 `did-finish-load` 或 `did-fail-load` 后退出，并返回相应退出码，适合 CI 或打包前的快速验证。该命令会启动真实 Electron，不能替代 `tests/smoke.mjs` 的静态检查。
 
+### 3.1 测试 provider（千机）构建
+
+默认构建只连接官方 DeepSeek，行为与 0.1.3 完全一致。内部验收可使用独立测试 profile；**测试包不对外分发，也不包含任何 Key**：
+
+```bash
+pnpm dist:test   # 产物：release-test/DSChat-0.2.0-qianji-test-x64.exe
+```
+
+`DSCHAT_PROFILE=qianji` 写入以下构建期常量（也可用同名 `DSCHAT_*` 变量逐项覆盖）：
+
+| 字段 | 默认（官方） | 千机测试 |
+| --- | --- | --- |
+| `DSCHAT_API_ORIGIN` | `https://api.deepseek.com` | `https://dygpt.duoyioa.com/qianji` |
+| `DSCHAT_MESSAGES_PATH` | `/anthropic/v1` | `/v1` |
+| `DSCHAT_MODEL` | `deepseek-flash` | `DS/DeepSeek-V4.1-Flash` |
+| `DSCHAT_MODELS_PATH` | `/models` | `/v1/models` |
+| `DSCHAT_VERIFY_MODE` | `models` | `message`（1-token POST） |
+| `features.files / speech / webTools` | `true` | `false` |
+
+千机测试构建会禁用附件、语音与联网工具，并在按钮 tooltip 与关于页显示明确提示；Key 仍由使用者在设置页输入，经 `safeStorage` 保存，不进入仓库、日志或产物。测试包输出到 `release-test/`，默认 `release/` 始终是官方构建。
+
 ## 4. 获取 API Key
 
 1. 登录 [DeepSeek 开放平台](https://platform.deepseek.com/)。

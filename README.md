@@ -35,6 +35,7 @@ pnpm start        # build and launch the desktop app
 pnpm smoke        # launch the built app and exit after page load
 pnpm dist:dir     # unpacked desktop app for local testing
 pnpm dist:win     # Windows installer / distributable
+pnpm dist:test    # qianji test build in release-test/ (not for distribution)
 ```
 
 `pnpm build` produces the web assets in `dist/`. Packaging commands use electron-builder and write installers to `release/` as configured by `build.directories.output` in [package.json](package.json).
@@ -58,6 +59,13 @@ DSChat v1 aims to reproduce the official demo's feature set on the desktop:
 - Upload, paste, or drag and drop attachments; voice input and read replies aloud. A live audio spectrum appears in the first row of the input area while recording on mobile layouts.
 - Markdown, syntax highlighting, KaTeX math, and Mermaid diagrams.
 - Simplified Chinese and English, light and dark themes (including follow-system), mobile layouts, location settings, and chat history import and export.
+
+Added in 0.2.0:
+
+- Sidebar chat search across titles and message text, with native `Ctrl+K` / `Ctrl+N` shortcuts (150 ms debounce).
+- Per-reply metadata: timestamp, input/cache/output tokens, and elapsed time (hidden on narrow layouts).
+- Window position/size memory with multi-monitor fallback, tray menu (show/hide, new chat, quit), and optional close-to-tray with a first-close hint.
+- About panel showing version, API endpoint, model, and available features, plus redacted local diagnostics export (OS/Electron versions included).
 
 A per-feature checklist with expected desktop behavior, verification steps, and known server-side dependencies is in [docs/FEATURE-PARITY.md](docs/FEATURE-PARITY.md). Manual release checks are in [docs/QA-CHECKLIST.md](docs/QA-CHECKLIST.md).
 
@@ -99,6 +107,7 @@ The endpoint must implement the Anthropic-compatible Messages / Files API and th
 | `pnpm smoke`      | Launch the built app and exit after page load |
 | `pnpm dist:dir`   | Package an unpacked desktop app in `release/` |
 | `pnpm dist:win`   | Package the Windows installer in `release/`   |
+| `pnpm dist:test`  | Build the qianji test installer in `release-test/` |
 | `pnpm type`       | Run TypeScript type checks                    |
 | `pnpm lint`       | Lint with oxlint                              |
 | `pnpm format`     | Format with oxfmt                             |

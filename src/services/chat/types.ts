@@ -75,6 +75,8 @@ export type AssistantMessage = MessageBranch & {
   id: string
   role: 'assistant'
   createdAt: number
+  /** 回复结束（done/stopped/error）的时间；历史或导入消息可能没有 */
+  completedAt?: number
   /** 未记录模型时为 null，续写使用当前默认模型。 */
   model: ChatModel | null
   /** 请求时是否开启深度思考 */

@@ -1,14 +1,20 @@
 import {
   app,
   BrowserWindow,
+  dialog,
   ipcMain,
   Menu,
+  nativeImage,
   net,
   protocol,
   safeStorage,
+  screen,
   session,
   shell,
+  Tray,
 } from 'electron'
+import os from 'node:os'
+import { createLogger, redactSensitive } from './logger.mjs'
 import {
   existsSync,
   mkdirSync,
@@ -66,6 +72,166 @@ let settingsFile = ''
 let currentApiKey = null
 /** 当前存档是否为系统加密格式；null 表示尚无存档 */
 let currentKeyEncrypted = null
+
+let logger = null
+/** @type {Tray | null} */
+let tray = null
+let isQuitting = false
+let windowStateFile = ''
+let windowStateTimer = null
+/** 窗口位置/大小与桌面偏好 */
+let windowState = {
+  width: 1200,
+  height: 800,
+  maximized: false,
+  closeToTray: false,
+  trayHintShown: false,
+}
+
+const tMain = (zh, en) => (app.getLocale().toLowerCase().startsWith('zh') ? zh : en)
+
+function loadWindowState() {
+  const fallback = {
+    width: 1200,
+    height: 800,
+    maximized: false,
+    closeToTray: false,
+    trayHintShown: false,
+  }
+  try {
+    const parsed = JSON.parse(readFileSync(windowStateFile, 'utf8'))
+    if (!parsed || typeof parsed !== 'object') return fallback
+    const clamp = (value, min, max, def) =>
+      typeof value === 'number' && Number.isFinite(value)
+        ? Math.min(max, Math.max(min, Math.round(value)))
+        : def
+    const coordinate = (value) =>
+      typeof value === 'number' && Number.isFinite(value) ? Math.round(value) : undefined
+    return {
+      width: clamp(parsed.width, 900, 10000, 1200),
+      height: clamp(parsed.height, 620, 10000, 800),
+      x: coordinate(parsed.x),
+      y: coordinate(parsed.y),
+      maximized: parsed.maximized === true,
+      closeToTray: parsed.closeToTray === true,
+      trayHintShown: parsed.trayHintShown === true,
+    }
+  } catch {
+    return fallback
+  }
+}
+
+function writeWindowState(patch) {
+  Object.assign(windowState, patch)
+  if (!windowStateFile) return
+  try {
+    mkdirSync(path.dirname(windowStateFile), { recursive: true })
+    const temp = `${windowStateFile}.${process.pid}.tmp`
+    writeFileSync(temp, `${JSON.stringify(windowState, null, 2)}\n`, 'utf8')
+    renameSync(temp, windowStateFile)
+  } catch (error) {
+    logger?.warn(`窗口状态保存失败：${error instanceof Error ? error.message : String(error)}`)
+  }
+}
+
+const intersects = (a, b) =>
+  a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y
+
+/** 只在保存的位置仍落在某个显示器工作区时恢复坐标，否则居中 */
+function restoredBounds() {
+  const { width, height, x, y } = windowState
+  if (typeof x === 'number' && typeof y === 'number') {
+    const visible = screen
+      .getAllDisplays()
+      .some((display) => intersects({ x, y, width, height }, display.workArea))
+    if (visible) {
+      return { x, y, width, height, center: false }
+    }
+  }
+  return { width, height, center: true }
+}
+
+function updateTrayMenu() {
+  if (!tray) return
+  const visible = mainWindow?.isVisible() === true
+  tray.setContextMenu(
+    Menu.buildFromTemplate([
+      {
+        label: visible ? tMain('隐藏窗口', 'Hide window') : tMain('显示窗口', 'Show window'),
+        click: toggleWindow,
+      },
+      {
+        label: tMain('新建对话', 'New chat'),
+        click: () => sendRendererCommand('new-chat'),
+      },
+      { type: 'separator' },
+      {
+        label: tMain('退出', 'Quit'),
+        click: () => {
+          isQuitting = true
+          app.quit()
+        },
+      },
+    ])
+  )
+}
+
+function toggleWindow() {
+  if (!mainWindow) {
+    createWindow()
+    return
+  }
+  if (mainWindow.isVisible()) {
+    mainWindow.hide()
+  } else {
+    if (mainWindow.isMinimized()) mainWindow.restore()
+    mainWindow.show()
+    mainWindow.focus()
+  }
+  updateTrayMenu()
+}
+
+function createTray() {
+  if (tray) return
+  const image = nativeImage.createFromPath(path.join(app.getAppPath(), 'build', 'icon.png'))
+  if (image.isEmpty()) {
+    logger?.warn('托盘图标缺失，跳过托盘创建')
+    return
+  }
+  tray = new Tray(image.resize({ width: 16, height: 16 }))
+  tray.setToolTip(APP_NAME)
+  logger?.info('托盘已创建')
+  tray.on('click', toggleWindow)
+  tray.on('double-click', () => {
+    mainWindow?.show()
+    mainWindow?.focus()
+  })
+  updateTrayMenu()
+}
+
+function sendRendererCommand(command) {
+  if (!mainWindow) return
+  if (mainWindow.isMinimized()) mainWindow.restore()
+  mainWindow.show()
+  mainWindow.focus()
+  mainWindow.webContents.send('app:command', command)
+  updateTrayMenu()
+}
+
+function showTrayHintOnce() {
+  if (windowState.trayHintShown) return
+  writeWindowState({ trayHintShown: true })
+  void dialog.showMessageBox({
+    type: 'info',
+    title: tMain('DSChat 仍在运行', 'DSChat is still running'),
+    message: tMain('DSChat 已最小化到托盘', 'DSChat was minimized to the tray'),
+    detail: tMain(
+      '双击托盘图标可以重新打开窗口；可在设置中关闭“关闭到托盘”。',
+      'Double-click the tray icon to reopen the window. You can turn this off in Settings.'
+    ),
+    buttons: [tMain('知道了', 'OK')],
+  })
+}
 
 /**
  * 从 userData/secrets.json 读取 API Key。
@@ -199,7 +365,65 @@ function registerIpc() {
     try {
       return saveApiKey(key)
     } catch (error) {
-      console.error('[settings] 保存 API Key 失败：', error)
+      logger?.error('保存 API Key 失败', error)
+      return false
+    }
+  })
+
+  ipcMain.on('desktop:get-prefs', (event) => {
+    event.returnValue = { closeToTray: windowState.closeToTray === true }
+  })
+
+  ipcMain.handle('desktop:set-close-to-tray', (_event, enabled) => {
+    writeWindowState({ closeToTray: enabled === true })
+    if (enabled === true) createTray()
+    updateTrayMenu()
+    return true
+  })
+
+  ipcMain.handle('diagnostics:export', async (event, info) => {
+    const senderUrl = event.senderFrame?.url ?? event.sender.getURL()
+    if (!isTrustedPageUrl(senderUrl)) return false
+
+    const input = info && typeof info === 'object' ? info : {}
+    const text = (value, max) => (typeof value === 'string' ? value.slice(0, max) : '')
+    const features =
+      input.features && typeof input.features === 'object'
+        ? {
+            files: input.features.files === true,
+            speech: input.features.speech === true,
+            webTools: input.features.webTools === true,
+          }
+        : null
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
+    const options = {
+      defaultPath: path.join(app.getPath('documents'), `DSChat-diagnostics-${stamp}.txt`),
+      filters: [{ name: 'Text', extensions: ['txt'] }],
+    }
+    const owner = mainWindow && !mainWindow.isDestroyed() ? mainWindow : undefined
+    const result = owner
+      ? await dialog.showSaveDialog(owner, options)
+      : await dialog.showSaveDialog(options)
+    if (result.canceled || !result.filePath) return false
+
+    const header = [
+      `DSChat ${text(input.version, 64) || app.getVersion()}`,
+      `API origin: ${text(input.apiOrigin, 512)}`,
+      `Model: ${text(input.model, 128)}`,
+      `Features: ${features ? JSON.stringify(features) : 'unknown'}`,
+      `Electron: ${process.versions.electron}`,
+      `Chrome: ${process.versions.chrome}`,
+      `Node: ${process.versions.node}`,
+      `OS: ${process.platform} ${process.arch} ${os.release()}`,
+      `Locale: ${app.getLocale()}`,
+    ].join('\n')
+
+    try {
+      writeFileSync(result.filePath, redactSensitive(`${header}\n\n${logger?.readAll() ?? ''}`), 'utf8')
+      logger?.info('诊断日志已导出')
+      return true
+    } catch (error) {
+      logger?.error('导出诊断日志失败', error)
       return false
     }
   })
@@ -291,6 +515,7 @@ function registerProtocolHandler() {
       return net.fetch(pathToFileURL(filePath).toString())
     } catch (error) {
       console.error('[protocol] 处理 dsc:// 请求失败：', error)
+      logger?.error('处理 dsc:// 请求失败', error)
       return new Response('Internal Server Error', {
         status: 500,
         headers: { 'content-type': 'text/plain; charset=utf-8' },
@@ -388,14 +613,15 @@ function wireWindowSecurity(win) {
 
   win.webContents.on('render-process-gone', (_event, details) => {
     console.error('[window] 渲染进程退出：', details.reason)
+    logger?.error(`渲染进程退出：${details.reason}`)
   })
 }
 
 function createWindow() {
   const iconPath = path.join(app.getAppPath(), 'build', 'icon.png')
+  const bounds = restoredBounds()
   const win = new BrowserWindow({
-    width: 1200,
-    height: 800,
+    ...bounds,
     minWidth: 900,
     minHeight: 620,
     title: APP_NAME,
@@ -413,10 +639,42 @@ function createWindow() {
 
   mainWindow = win
   win.once('ready-to-show', () => {
+    if (windowState.maximized) {
+      win.maximize()
+    }
     win.show()
+    updateTrayMenu()
+  })
+
+  const saveBounds = () => {
+    if (win.isDestroyed()) return
+    writeWindowState({ ...win.getNormalBounds(), maximized: win.isMaximized() })
+  }
+  const scheduleSaveBounds = () => {
+    clearTimeout(windowStateTimer)
+    windowStateTimer = setTimeout(saveBounds, 300)
+  }
+  win.on('resize', scheduleSaveBounds)
+  win.on('move', scheduleSaveBounds)
+  win.on('maximize', scheduleSaveBounds)
+  win.on('unmaximize', scheduleSaveBounds)
+  win.on('show', updateTrayMenu)
+  win.on('hide', updateTrayMenu)
+  win.on('close', (event) => {
+    saveBounds()
+    logger?.info(
+      `窗口关闭 closeToTray=${windowState.closeToTray} tray=${tray !== null} quitting=${isQuitting}`
+    )
+    if (!isQuitting && windowState.closeToTray && tray) {
+      event.preventDefault()
+      win.hide()
+      showTrayHintOnce()
+      updateTrayMenu()
+    }
   })
   win.on('closed', () => {
     if (mainWindow === win) mainWindow = null
+    updateTrayMenu()
   })
 
   wireWindowSecurity(win)
@@ -479,6 +737,7 @@ function createWindow() {
   win.webContents.on('did-fail-load', (_event, code, description, url, isMainFrame) => {
     if (isMainFrame) {
       console.error(`[window] 页面加载失败 ${code} ${description} ${url}`)
+      logger?.warn(`页面加载失败 ${code} ${description}`)
     }
   })
 
@@ -486,6 +745,7 @@ function createWindow() {
   console.log(`[main] loading ${target}`)
   win.loadURL(target).catch((error) => {
     console.error('[window] loadURL 失败：', error)
+    logger?.error('loadURL 失败', error)
     if (SMOKE) app.exit(1)
   })
 
@@ -511,6 +771,21 @@ function buildMenu() {
         { role: 'copy' },
         { role: 'paste' },
         { role: 'selectAll' },
+      ],
+    },
+    {
+      label: tMain('会话', 'Chat'),
+      submenu: [
+        {
+          label: tMain('新建对话', 'New chat'),
+          accelerator: 'CmdOrCtrl+N',
+          click: () => sendRendererCommand('new-chat'),
+        },
+        {
+          label: tMain('搜索对话', 'Search chats'),
+          accelerator: 'CmdOrCtrl+K',
+          click: () => sendRendererCommand('search'),
+        },
       ],
     },
     {
@@ -547,18 +822,31 @@ if (!gotSingleInstanceLock) {
   })
 
   app.whenReady().then(() => {
+    logger = createLogger(path.join(app.getPath('userData'), 'logs'))
+    logger.info(`应用启动 v${app.getVersion()} electron ${process.versions.electron}`)
     settingsFile = path.join(app.getPath('userData'), 'secrets.json')
+    windowStateFile = path.join(app.getPath('userData'), 'window-state.json')
+    windowState = loadWindowState()
     currentApiKey = loadApiKey()
 
     registerIpc()
     registerProtocolHandler()
     registerPermissions()
     buildMenu()
+    createTray()
     createWindow()
 
     app.on('activate', () => {
       if (BrowserWindow.getAllWindows().length === 0) createWindow()
     })
+  })
+
+  app.on('before-quit', () => {
+    isQuitting = true
+  })
+
+  app.on('will-quit', () => {
+    logger?.info('应用退出')
   })
 
   app.on('window-all-closed', () => {

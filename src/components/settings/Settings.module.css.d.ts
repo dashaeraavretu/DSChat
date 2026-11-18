@@ -33,6 +33,19 @@ declare const styles: {
   readonly "importConfirmText": string;
   readonly "deleteConfirm": string;
   readonly "deleteActions": string;
+  readonly "aboutBar": string;
+  readonly "aboutText": string;
+  readonly "aboutLink": string;
+  readonly "switch": string;
+  readonly "switchOn": string;
+  readonly "switchThumb": string;
+  readonly "aboutDialog": string;
+  readonly "aboutRows": string;
+  readonly "aboutRow": string;
+  readonly "aboutLabel": string;
+  readonly "aboutValue": string;
+  readonly "aboutWarning": string;
+  readonly "aboutDescription": string;
 };
 export = styles;
 

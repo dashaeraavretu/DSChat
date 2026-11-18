@@ -30,6 +30,8 @@ type Settings = {
   thinking: boolean
   search: boolean
   siderCollapsed: boolean
+  /** 桌面端关闭窗口时保留在托盘 */
+  closeToTray: boolean
 }
 
 const KEYS = {
@@ -145,6 +147,7 @@ export const useSettings = create<Settings>(() => ({
   thinking: read(KEYS.thinking) === 'true',
   search: read(KEYS.search) === 'true',
   siderCollapsed: read(KEYS.siderCollapsed) === 'true',
+  closeToTray: desktopBridge()?.desktopPrefs?.closeToTray === true,
 }))
 
 export const setLocale = (locale: Locale) => {
@@ -303,4 +306,17 @@ export const setSearch = (search: boolean) => {
 export const setSiderCollapsed = (siderCollapsed: boolean) => {
   write(KEYS.siderCollapsed, String(siderCollapsed))
   useSettings.setState({ siderCollapsed })
+}
+
+/** 关闭到托盘保存在主进程的 window-state.json，与窗口位置一起管理 */
+export const setCloseToTray = (closeToTray: boolean) => {
+  useSettings.setState({ closeToTray })
+  const bridge = desktopBridge()
+  if (bridge && typeof bridge.setCloseToTray === 'function') {
+    void bridge.setCloseToTray(closeToTray).then((ok) => {
+      if (!ok) {
+        useSettings.setState({ closeToTray: !closeToTray })
+      }
+    })
+  }
 }

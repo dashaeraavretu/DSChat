@@ -558,7 +558,7 @@
 - 使用 `dsc://app` 自定义协议加载 `dist/`：`standard`、`secure`、支持 fetch/CORS/stream，使 IndexedDB、localStorage、WebCrypto、getUserMedia 正常工作。
 - 开发模式 `DSCHAT_DEV=1` 加载 `http://localhost:8090`。
 - `contextIsolation: true`、`sandbox: true`、`nodeIntegration: false`；preload 只暴露白名单桥接。
-- 外部链接通过系统浏览器打开；应用内禁止任意外部导航和 `<webview>`。附件/图片原件的同源 `blob:` 预览使用同 partition、无 preload、`sandbox`/`contextIsolation` 的只读子窗口；子窗口只允许停留在初始 `blob:`，外部导航、重定向与新窗口全部拦截；`data:` URL 不放行。父级 localStorage 隔离未在 0.1.3 实现，defer 到 v1.1。
+- 外部链接通过系统浏览器打开；应用内禁止任意外部导航和 `<webview>`。附件/图片原件的同源 `blob:` 预览使用同 partition、无 preload、`sandbox`/`contextIsolation` 的受控预览子窗口；子窗口只允许停留在初始 `blob:`，外部导航、重定向与新窗口全部拦截；`data:` URL 不放行。父级 localStorage 隔离未在 0.1.3 实现，defer 到 v1.1。
 - 只放行受信任页面的音频权限；摄像头及 `audio+video` 组合请求一律拒绝。
 - 单实例锁；生产包禁用 DevTools；窗口最小尺寸 900×620；应用标题 DSChat。
 - 支持 `--smoke` 启动检查。
@@ -582,7 +582,7 @@
 1. **服务端扩展依赖**：智能搜索、链接阅读、ASR/TTS、安全过滤、自动标题、继续生成、`latest_reminder` 均需 DeepSeek 官方或兼容服务支持。仅替换普通 OpenAI 风格接口不足以实现这些功能。
 2. **`document` 块兼容性**：应用始终开启扩展模式（`safety_check: high`、`deepseek_read_url`），而类型注释指出扩展模式可能不支持非图片 `document` 块并返回 400。PDF/Office/文本附件必须在目标服务上单独验收。
 3. **`dsc://app` CORS 风险**：渲染层从自定义协议源直接请求 API，没有主进程代理。若服务端只允许网页源或不允许 `dsc://app`，打包版请求会失败。上线前必须验证；必要时补主进程代理。
-4. **本地附件打开（v1 已处理）**：已发送的附件/图片原件通过 `window.open(blob:…)` 打开；主进程仅对同源 `blob:` 放行受控只读子窗口（同 partition、无 preload、`sandbox`/`contextIsolation`），子窗口导航、重定向与新窗口均被拦截；`data:` 不放行，`http/https` 仍交给系统浏览器。`pnpm smoke:blob` 与真实 PNG/PDF 预览实测通过。预览与主窗口同源，父级 localStorage 隔离 defer 到 v1.1。
+4. **本地附件打开（v1 已处理）**：已发送的附件/图片原件通过 `window.open(blob:…)` 打开；主进程仅对同源 `blob:` 放行受控预览子窗口（同 partition、无 preload、`sandbox`/`contextIsolation`），子窗口导航、重定向与新窗口均被拦截；`data:` 不放行，`http/https` 仍交给系统浏览器。`pnpm smoke:blob` 与真实 PNG/PDF 预览实测通过。预览与主窗口同源，父级 localStorage 隔离 defer 到 v1.1。
 5. **密钥生命周期**：设置页已提供“清除 API Key”（确认后删除 `secrets.json`、主进程内存与旧 localStorage 键）；仍没有启动时校验。`safeStorage` 不可用或回退 localStorage 时，设置页按主进程状态显示“未加密/降级”，不再声称已加密；发布说明仍应披露降级路径。
 6. **网页版与桌面版数据不互通**：`localhost:8090`、`dsc://app` 和 `file://` 是不同存储源，会话/附件不会自动迁移；只有 API Key 有迁移逻辑。历史需通过 ZIP 导入导出。
 7. **远端文件生命周期**：`deleteFile` 从未调用；删除会话、移除附件或删除全部对话都不会删除已上传到 API 服务的文件，可能累积占用配额，且删除确认文案与实际行为不一致。

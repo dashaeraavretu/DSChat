@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { createId } from '../../utils/id.js'
 import { ApiError, streamMessage } from '../api/client.js'
+import { API_MODEL, FEATURES } from '../buildInfo.js'
 import type { ChatModel, CreateMessageRequest } from '../api/types.js'
 import { extractFileIds, getFileErrorCode, isRetryableApiError } from '../api/errors.js'
 import { cancelUpload, describeUploadError, uploadAttachment, useUploads } from '../attachments.js'
@@ -32,8 +33,8 @@ import {
   type UserMessage,
 } from './types.js'
 
-/** deepseek-flash 同时支持深度思考与图片输入 */
-const MODEL: ChatModel = 'deepseek-flash'
+/** 构建期模型；默认 deepseek-flash，测试 provider 可覆盖 */
+const MODEL: ChatModel = API_MODEL
 /** 所有生成请求统一携带的助手身份说明 */
 const SYSTEM_PROMPT = '该助手为DeepSeek，由深度求索公司创造。'
 /** 保留最近打开的详情；当前会话、生成中及尚未成功保存的会话不淘汰。 */
@@ -47,6 +48,10 @@ const FILE_RETRY_BASE_DELAY = 1000
 
 /** 阅读链接始终开启，智能搜索开关控制是否另行声明搜索工具（含边想边搜）。 */
 const serverTools = (search: boolean): CreateMessageRequest['tools'] => {
+  // 测试 provider 的 webTools 关闭时不声明任何服务端工具，避免 404
+  if (!FEATURES.webTools) {
+    return []
+  }
   const tools: CreateMessageRequest['tools'] = [
     { type: 'deepseek_read_url', name: 'deepseek_read_url' },
   ]
@@ -262,7 +267,7 @@ const createReply = (): AssistantMessage => {
     createdAt: Date.now(),
     model: MODEL,
     thinking,
-    search,
+    search: FEATURES.webTools ? search : false,
     prefix: true,
     status: 'pending',
     blocks: [],

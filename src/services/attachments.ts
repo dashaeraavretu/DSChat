@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import type { LinkedMessage, TranslationMessage } from '../i18n/index.js'
-import { uploadFile } from './api/client.js'
+import { ApiError, uploadFile } from './api/client.js'
+import { FEATURES } from './buildInfo.js'
 import { classifyApiError, getUploadErrorInfo, isRetryableApiError } from './api/errors.js'
 import type { FilePurpose } from './api/types.js'
 import { ACCEPT_FILE_EXTS } from './uploadExts.js'
@@ -171,6 +172,9 @@ export const uploadAttachment = (
   name: string,
   isImage: boolean
 ): Promise<string> => {
+  if (!FEATURES.files) {
+    return Promise.reject(new ApiError('http', { key: 'featureUnavailableFiles' }))
+  }
   const current = pending.get(id)
   if (current) {
     return current.promise

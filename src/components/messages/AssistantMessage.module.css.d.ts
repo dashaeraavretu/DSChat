@@ -10,6 +10,7 @@ declare const styles: {
   readonly "alwaysShow": string;
   readonly "continueButton": string;
   readonly "summary": string;
+  readonly "meta": string;
   readonly "summaryActive": string;
 };
 export = styles;

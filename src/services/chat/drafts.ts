@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import type { TranslationMessage } from '../../i18n/index.js'
 import { createId } from '../../utils/id.js'
+import { FEATURES } from '../buildInfo.js'
 import {
   cancelUpload,
   isImage,
@@ -65,6 +66,9 @@ export const addDraftFiles = (
 ): TranslationMessage | null => {
   if (files.length === 0) {
     return null
+  }
+  if (!FEATURES.files) {
+    return { key: 'featureUnavailableFiles' }
   }
   const error = validateFiles(files, getDraft(sessionId).attachments.length)
   if (error) {

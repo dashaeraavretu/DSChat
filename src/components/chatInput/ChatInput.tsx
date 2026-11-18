@@ -21,6 +21,7 @@ import {
   useDrafts,
 } from '../../services/chat/drafts.js'
 import { stopReadAloud } from '../../services/speech/readAloud.js'
+import { FEATURES } from '../../services/buildInfo.js'
 import { IconButton } from '../base/IconButton.js'
 import { Tooltip } from '../base/Tooltip.js'
 import { ensureApiKey } from '../settings/settingsDialogState.js'
@@ -75,7 +76,14 @@ const Input = ({ sessionId }: { sessionId: string | null }) => {
   }, [t])
 
   const acceptFiles = (files: File[]) => {
-    if (files.length === 0 || useChatStore.getState().importingHistory || !ensureApiKey()) {
+    if (files.length === 0) {
+      return
+    }
+    if (!FEATURES.files) {
+      showToast({ key: 'featureUnavailableFiles' })
+      return
+    }
+    if (useChatStore.getState().importingHistory || !ensureApiKey()) {
       return
     }
     const error = addDraftFiles(sessionId, files, useSettings.getState().apiKey ?? '')
@@ -214,12 +222,18 @@ const Input = ({ sessionId }: { sessionId: string | null }) => {
               <span className={styles.toggleLabel}>{t('thinkingSwitch')}</span>
             </button>
           </Tooltip>
-          <Tooltip content={t('deactivatedSearchTooltip')}>
+          <Tooltip
+            content={
+              FEATURES.webTools ? t('deactivatedSearchTooltip') : t('featureUnavailableWebTools')
+            }
+          >
             <button
               type="button"
-              className={clsx(styles.toggle, search && styles.selected)}
+              className={clsx(styles.toggle, search && FEATURES.webTools && styles.selected)}
               aria-label={t('search')}
-              aria-pressed={search}
+              aria-pressed={search && FEATURES.webTools}
+              aria-disabled={!FEATURES.webTools}
+              disabled={!FEATURES.webTools}
               onClick={() => setSearch(!search)}
             >
               <IconGlobeLanguageOutline14 />
@@ -231,6 +245,7 @@ const Input = ({ sessionId }: { sessionId: string | null }) => {
           <VoiceButton
             status={voice.status}
             disabled={!voice.available}
+            unavailable={!FEATURES.speech}
             seconds={voice.seconds}
             onClick={() => {
               if (
@@ -245,8 +260,8 @@ const Input = ({ sessionId }: { sessionId: string | null }) => {
             size="m"
             tone="primary"
             icon={<IconPaperclipOutline16 />}
-            tooltip={t('uploadFile')}
-            disabled={importingHistory}
+            tooltip={FEATURES.files ? t('uploadFile') : t('featureUnavailableFiles')}
+            disabled={importingHistory || !FEATURES.files}
             onClick={() => ensureApiKey() && fileInputRef.current?.click()}
           />
           <input

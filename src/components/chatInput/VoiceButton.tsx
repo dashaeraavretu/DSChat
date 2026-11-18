@@ -14,26 +14,32 @@ import styles from './VoiceButton.module.css'
 export const VoiceButton = ({
   status,
   disabled = false,
+  unavailable = false,
   seconds,
   onClick,
 }: {
   status: VoiceInputStatus
   /** 非安全上下文中按钮置灰，tooltip 提示录音需要 HTTPS */
   disabled?: boolean
+  /** 当前服务不支持语音时置灰，并给出明确提示 */
+  unavailable?: boolean
   /** 本次录音已录秒数，录音中显示在按钮左侧 */
   seconds: number
   onClick: () => void
 }) => {
   const t = useTranslate()
   const recording = status === 'recording'
+  const isDisabled = disabled || unavailable
 
-  const label = disabled
-    ? t('voiceInputRequiresHttps')
-    : recording
-      ? t('voiceInputStop')
-      : status === 'transcribing'
-        ? t('voiceInputCancel')
-        : t('voiceInput')
+  const label = unavailable
+    ? t('featureUnavailableSpeech')
+    : disabled
+      ? t('voiceInputRequiresHttps')
+      : recording
+        ? t('voiceInputStop')
+        : status === 'transcribing'
+          ? t('voiceInputCancel')
+          : t('voiceInput')
 
   return (
     <>
@@ -44,13 +50,14 @@ export const VoiceButton = ({
           className={clsx(
             styles.button,
             recording && styles.recording,
-            disabled && styles.disabled
+            isDisabled && styles.disabled
           )}
           aria-label={label}
           aria-pressed={recording}
-          aria-disabled={disabled}
+          aria-disabled={isDisabled}
+          disabled={isDisabled}
           onClick={() => {
-            if (!disabled) {
+            if (!isDisabled) {
               onClick()
             }
           }}

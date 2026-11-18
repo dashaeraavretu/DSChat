@@ -1,3 +1,4 @@
+import { FEATURES } from '../buildInfo.js'
 import { ApiError, API_ORIGIN, request } from './client.js'
 
 /**
@@ -19,6 +20,9 @@ export const transcribe = async (
   audio: Blob,
   signal?: AbortSignal
 ): Promise<string> => {
+  if (!FEATURES.speech) {
+    throw new ApiError('http', { key: 'featureUnavailableSpeech' })
+  }
   const form = new FormData()
   form.append('file', audio, 'recording.wav')
   const response = await request(`${TOOLS_BASE_URL}/asr`, {
@@ -52,6 +56,9 @@ export const synthesize = async (
   voice: TtsVoice,
   signal: AbortSignal
 ): Promise<ReadableStream<Uint8Array>> => {
+  if (!FEATURES.speech) {
+    throw new ApiError('http', { key: 'featureUnavailableSpeech' })
+  }
   const response = await request(`${TOOLS_BASE_URL}/tts`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },

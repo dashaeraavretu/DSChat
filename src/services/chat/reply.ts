@@ -148,6 +148,7 @@ export const settleReply = (
 ): AssistantMessage => ({
   ...reply,
   status,
+  completedAt: now,
   error,
   blocks: reply.blocks.flatMap((block): ReplyBlock[] => {
     if (reply.stopReason === 'refusal' && (block.type === 'thinking' || block.type === 'text')) {
