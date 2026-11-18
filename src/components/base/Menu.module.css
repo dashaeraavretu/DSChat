@@ -20,16 +20,24 @@
   display: flex;
   align-items: center;
   gap: 8px;
+  width: 100%;
+  box-sizing: border-box;
   padding: 8px 10px;
+  border: 0;
   border-radius: 8px;
+  background: none;
+  color: var(--dsw-alias-label-primary);
+  font: inherit;
   font-size: 14px;
   line-height: 24px;
-  color: var(--dsw-alias-label-primary);
+  text-align: left;
   cursor: pointer;
   user-select: none;
 
-  &:hover {
+  &:hover,
+  &:focus-visible {
     background-color: var(--dsw-alias-interactive-bg-hover);
+    outline: none;
   }
 }
 

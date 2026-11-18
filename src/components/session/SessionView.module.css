@@ -59,7 +59,7 @@
   user-select: none;
 }
 
-@media not all and (min-width: 768px) {
+@media not all and (min-width: 700px) {
   .inputContainer {
     position: relative;
     bottom: auto;

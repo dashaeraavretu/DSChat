@@ -54,7 +54,7 @@
   }
 }
 
-@media not all and (min-width: 768px) {
+@media not all and (min-width: 700px) {
   .panel {
     position: fixed;
     inset: 0;

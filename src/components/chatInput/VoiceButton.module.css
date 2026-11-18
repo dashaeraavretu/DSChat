@@ -10,7 +10,7 @@
 }
 
 /* 窄屏空间不足，读秒整体不展示 */
-@media not all and (min-width: 768px) {
+@media not all and (min-width: 700px) {
   .timer {
     display: none;
   }

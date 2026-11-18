@@ -156,7 +156,9 @@ export const createConfig = ({
       meta: { 'application-version': version },
     }),
     new rspack.DefinePlugin({
-      __APP_VERSION__: JSON.stringify(version),
+      __APP_VERSION__: JSON.stringify(
+        process.env.DSCHAT_DISPLAY_VERSION?.trim() || version
+      ),
       __API_ORIGIN__: JSON.stringify(origin),
       __MESSAGES_BASE__: JSON.stringify(messagesBase),
       __MODELS_URL__: JSON.stringify(modelsUrl),

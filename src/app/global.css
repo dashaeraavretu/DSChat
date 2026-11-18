@@ -43,7 +43,7 @@ body.change-theme *::after {
   transition: none !important;
 }
 
-@media not all and (min-width: 768px) {
+@media not all and (min-width: 700px) {
   html,
   body,
   #root {

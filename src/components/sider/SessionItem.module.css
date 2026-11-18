@@ -65,7 +65,7 @@
   }
 }
 
-@media not all and (min-width: 768px) {
+@media not all and (min-width: 700px) {
   .item {
     height: 44px;
     padding: 11px 6px 11px 12px;

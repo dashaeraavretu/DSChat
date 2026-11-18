@@ -52,7 +52,7 @@
   text-align: center;
 }
 
-@media not all and (min-width: 768px) {
+@media not all and (min-width: 700px) {
   .frame {
     position: fixed;
     top: var(--app-viewport-top, 0px);
