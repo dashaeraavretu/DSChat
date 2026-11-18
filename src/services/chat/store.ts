@@ -118,8 +118,8 @@ const sameSummary = (a: SessionSummary, b: SessionSummary) =>
   a.title === b.title &&
   a.createdAt === b.createdAt &&
   a.updatedAt === b.updatedAt &&
-  a.pinned === b.pinned &&
-  a.ephemeral === b.ephemeral
+  Boolean(a.pinned) === Boolean(b.pinned) &&
+  Boolean(a.ephemeral) === Boolean(b.ephemeral)
 
 const sessionAccess = new Map<string, number>()
 const unsavedSessions = new Set<string>()
@@ -145,6 +145,8 @@ const trimSessionCache = () => {
     .filter(
       (id) =>
         id !== state.activeId &&
+        // 临时会话不在 IndexedDB 里，淘汰后无法重新读取，只能一直留在内存中。
+        !state.sessionCache[id]?.ephemeral &&
         !Object.hasOwn(state.streaming, id) &&
         !unsavedSessions.has(id) &&
         !deletingSessions.has(id)
@@ -444,6 +446,8 @@ export const replaceHistory = async (write: () => Promise<void>): Promise<number
       sessionLoadErrors: {},
       sessionSaveErrors: {},
       activeId: null,
+      // 临时会话只属于当前内存；替换/清空历史后连同意图一起丢弃。
+      ephemeralNewChat: false,
     })
     return summaries.length
   } finally {
@@ -466,19 +470,41 @@ export const newChat = (ephemeral = false) => {
   }
 }
 
-/** 置顶/取消置顶；临时会话只改内存。 */
+/** 置顶/取消置顶；临时会话只改内存，未加载的普通会话直接更新摘要与库。 */
 export const toggleSessionPin = (sessionId: string) => {
   if (get().importingHistory || deletingSessions.has(sessionId)) {
     return
   }
-  updateSession(sessionId, (session) => ({ ...session, pinned: !session.pinned }))
-  persist(sessionId)
+  const session = getSession(sessionId)
+  if (session) {
+    updateSession(sessionId, (current) => ({
+      ...current,
+      pinned: current.pinned ? undefined : true,
+    }))
+    persist(sessionId)
+    return
+  }
+  const summary = get().sessions.find((item) => item.id === sessionId)
+  if (!summary) {
+    return
+  }
+  const pinned = !summary.pinned
+  set((state) => ({
+    sessions: sortSessions(
+      state.sessions.map((item) =>
+        item.id === sessionId ? toSessionSummary({ ...item, pinned }) : item
+      )
+    ),
+  }))
+  if (!summary.ephemeral) {
+    void db.setSessionPinned(sessionId, pinned).catch(db.reportStorageError('pin session'))
+  }
 }
 
 export const selectSession = (id: string) => {
   if (!get().importingHistory && get().sessions.some((session) => session.id === id)) {
     touchSession(id)
-    set({ activeId: id })
+    set({ activeId: id, ephemeralNewChat: false })
     void ensureSessionLoaded(id)
     trimSessionCache()
   }
@@ -520,6 +546,9 @@ const removeSessionData = async (id: string): Promise<boolean> => {
     return false
   }
   const epoch = historyEpoch
+  const ephemeral =
+    get().sessions.find((session) => session.id === id)?.ephemeral === true ||
+    getSession(id)?.ephemeral === true
   deletingSessions.add(id)
   try {
     getStreamController(id)?.abort()
@@ -528,9 +557,14 @@ const removeSessionData = async (id: string): Promise<boolean> => {
     if (epoch !== historyEpoch) {
       return false
     }
-    await db.deleteSession(id)
-    if (epoch !== historyEpoch) {
-      return true
+    if (ephemeral) {
+      // 临时会话从未落盘；顺带清理可能存在的旧记录，失败也不影响从列表移除。
+      void db.deleteSession(id).catch(db.reportStorageError('delete ephemeral session'))
+    } else {
+      await db.deleteSession(id)
+      if (epoch !== historyEpoch) {
+        return true
+      }
     }
     sessionLoads.delete(id)
     sessionAccess.delete(id)

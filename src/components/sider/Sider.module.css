@@ -320,3 +320,13 @@
   white-space: nowrap;
   text-overflow: ellipsis;
 }
+
+.newChatRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.newChatRow .newChat {
+  flex: 1;
+}

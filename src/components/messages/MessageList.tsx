@@ -1,3 +1,4 @@
+import clsx from 'clsx'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useIsMobile } from '../../app/viewport.js'
 import {
@@ -6,6 +7,7 @@ import {
   type MessageVersions,
 } from '../../services/chat/branches.js'
 import { selectMessageVersion } from '../../services/chat/store.js'
+import { useSettings } from '../../services/settings.js'
 import type { Session } from '../../services/chat/types.js'
 import { closeSearchPanel } from '../search/searchPanelState.js'
 import { AssistantMessage } from './AssistantMessage.js'
@@ -43,6 +45,7 @@ export const MessageList = ({
   footer: React.ReactNode
 }) => {
   const isMobile = useIsMobile()
+  const readingWidth = useSettings((state) => state.readingWidth)
   const scrollRef = useRef<HTMLDivElement>(null)
   const contentRef = useRef<HTMLDivElement>(null)
   const stickyRef = useRef(true)
@@ -145,7 +148,7 @@ export const MessageList = ({
     <ScrollToBottomContext.Provider value={scrollToBottom}>
       <div ref={isMobile ? undefined : scrollRef} className={styles.container}>
         <div ref={isMobile ? scrollRef : undefined} className={styles.scroll}>
-          <div ref={contentRef} className={styles.column}>
+          <div ref={contentRef} className={clsx(styles.column, readingWidth === 'wide' && styles.wide)}>
             {messages.map((message, index) =>
               message.role === 'user' ? (
                 <UserMessage

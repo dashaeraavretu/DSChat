@@ -222,6 +222,8 @@
 
 .ds-markdown-math.katex-display {
   display: block;
+  /* 外层 wrap 负责段落间距；这里归零，避免 span 嵌套后 :first-child 恒命中 */
+  margin: 0;
   text-align: center;
   overflow-x: auto;
   overflow-y: hidden;
@@ -229,15 +231,15 @@
   padding: 4px;
 }
 
-.ds-markdown > * .ds-markdown-math {
+.ds-markdown .ds-markdown-math-wrap {
   margin: 16px 0;
 }
 
-.ds-markdown > * .ds-markdown-math:first-child {
+.ds-markdown .ds-markdown-math-wrap:first-child {
   margin-top: 0;
 }
 
-.ds-markdown > * .ds-markdown-math:last-child {
+.ds-markdown .ds-markdown-math-wrap:last-child {
   margin-bottom: 0;
 }
 
@@ -377,4 +379,56 @@
   padding: 16px;
   color: var(--dsw-alias-label-secondary);
   font-size: 14px;
+}
+
+.ds-markdown-math-wrap {
+  position: relative;
+  display: block;
+}
+
+.ds-math-copy {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 8px;
+  background-color: var(--dsw-alias-bg-layer-2);
+  color: var(--dsw-alias-label-secondary);
+  opacity: 0;
+  /* 隐藏时不拦截公式文本的选择与消息点击 */
+  pointer-events: none;
+  user-select: none;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.ds-markdown-math-wrap:hover .ds-math-copy,
+.ds-math-copy:focus-visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.ds-math-copy:hover {
+  color: var(--dsw-alias-label-primary);
+}
+
+.ds-math-copy:focus-visible {
+  outline: 2px solid var(--dsw-alias-brand-text);
+  outline-offset: 2px;
+}
+
+/* 触摸设备没有 hover，按钮常显，避免出现不可见的可点击区域 */
+@media (hover: none) {
+  .ds-math-copy {
+    opacity: 1;
+    pointer-events: auto;
+  }
 }

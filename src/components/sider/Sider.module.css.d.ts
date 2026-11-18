@@ -3,6 +3,7 @@ declare const styles: {
   readonly "top": string;
   readonly "appName": string;
   readonly "newChat": string;
+  readonly "newChatRow": string;
   readonly "newChatIcon": string;
   readonly "listWrap": string;
   readonly "list": string;

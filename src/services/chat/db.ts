@@ -75,17 +75,47 @@ const getDB = () =>
     throw error
   }))
 
-export const loadSessionSummaries = async (): Promise<SessionSummary[]> =>
-  (await (await getDB()).getAll('sessionSummaries')).map(toSessionSummary)
+/** 清掉误写入的临时会话记录；失败不影响读取，下次启动继续尝试。 */
+const discardStoredSessions = async (ids: string[]): Promise<void> => {
+  if (ids.length === 0) {
+    return
+  }
+  const tx = (await getDB()).transaction(['sessions', 'sessionSummaries'], 'readwrite')
+  await Promise.all([
+    ...ids.flatMap((id) => [
+      tx.objectStore('sessions').delete(id),
+      tx.objectStore('sessionSummaries').delete(id),
+    ]),
+    tx.done,
+  ])
+}
 
-export const loadSession = async (id: string): Promise<Session | undefined> =>
-  (await getDB()).get('sessions', id)
+export const loadSessionSummaries = async (): Promise<SessionSummary[]> => {
+  const stored = await (await getDB()).getAll('sessionSummaries')
+  // 临时会话只存在内存；若旧版本或异常调用写进来过，读取时清掉且不返回。
+  const ephemeralIds = stored.filter((summary) => summary.ephemeral).map((summary) => summary.id)
+  if (ephemeralIds.length > 0) {
+    await discardStoredSessions(ephemeralIds).catch(() => {
+      // 清理失败不影响本次读取，记录仍会被过滤掉。
+    })
+  }
+  return stored.filter((summary) => !summary.ephemeral).map(toSessionSummary)
+}
 
-/** 会话搜索需要读取全部会话正文；仅在用户输入搜索词时调用。 */
+export const loadSession = async (id: string): Promise<Session | undefined> => {
+  const session = await (await getDB()).get('sessions', id)
+  return session?.ephemeral ? undefined : session
+}
+
+/** 会话搜索需要读取全部会话正文；仅在用户输入搜索词时调用。临时会话不进搜索。 */
 export const loadAllSessions = async (): Promise<Session[]> =>
-  (await getDB()).getAll('sessions')
+  (await (await getDB()).getAll('sessions')).filter((session) => !session.ephemeral)
 
 export const saveSession = async (session: Session, files: StoredFile[] = []): Promise<void> => {
+  // 临时会话不落盘：即使调用方遗漏了内存侧判断，也不能写入会话、摘要或附件原件。
+  if (session.ephemeral) {
+    return
+  }
   const summary = storedSummary(session)
   const tx = (await getDB()).transaction(['sessions', 'sessionSummaries', 'files'], 'readwrite')
   await Promise.all([
@@ -113,11 +143,38 @@ export const renameSession = async (id: string, title: string): Promise<void> =>
       try {
         const sessions = tx.objectStore('sessions')
         const session = await sessions.get(id)
-        if (session) {
+        // 临时会话不应存在于库里；旧记录不因重命名再次写回。
+        if (session && !session.ephemeral) {
           session.title = title
           await sessions.put(session)
           await tx.objectStore('sessionSummaries').put(storedSummary(session))
         }
+      } catch (error) {
+        abortTransaction(tx)
+        throw error
+      }
+    })(),
+    tx.done,
+  ])
+}
+
+/**
+ * 未加载详情的会话也能置顶：只读取该会话，原子更新详情和列表摘要。
+ * 临时会话不应出现在这里，直接跳过。
+ */
+export const setSessionPinned = async (id: string, pinned: boolean): Promise<void> => {
+  const tx = (await getDB()).transaction(['sessions', 'sessionSummaries'], 'readwrite')
+  await Promise.all([
+    (async () => {
+      try {
+        const sessions = tx.objectStore('sessions')
+        const session = await sessions.get(id)
+        if (!session || session.ephemeral) {
+          return
+        }
+        session.pinned = pinned ? true : undefined
+        await sessions.put(session)
+        await tx.objectStore('sessionSummaries').put(storedSummary(session))
       } catch (error) {
         abortTransaction(tx)
         throw error

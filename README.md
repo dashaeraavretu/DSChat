@@ -60,6 +60,13 @@ DSChat v1 aims to reproduce the official demo's feature set on the desktop:
 - Markdown, syntax highlighting, KaTeX math, and Mermaid diagrams.
 - Simplified Chinese and English, light and dark themes (including follow-system), mobile layouts, location settings, and chat history import and export.
 
+Added in 0.3.0:
+
+- Prompt presets in a third Settings tab: create/edit, default marker, per-session snapshot and per-turn system injection; empty chats show the preset greeting.
+- Import Tavern character cards V2/V3 from `.json` or `.png` (tEXt/iTXt `chara` / `ccv3`) into a preset; no world books, group chat or STscript.
+- Temporary chats (memory only), session pinning, comfortable/wide reading width, TTS speed 0.8/1.0/1.2, and Enter / Ctrl+Enter send preference.
+- Copy button on hover for display math blocks; CJK bold Markdown regression coverage.
+
 Added in 0.2.1:
 
 - Export a single conversation branch as Markdown from the session menu.

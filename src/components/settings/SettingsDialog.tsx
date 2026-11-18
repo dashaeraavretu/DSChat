@@ -7,6 +7,7 @@ import {
   IconFollowsystemOutline16,
   IconLightOutline16,
   IconSettingsOutline16,
+  IconThinkOutline16,
   IconUploadOutline14,
 } from '../base/icons.js'
 import {
@@ -26,11 +27,17 @@ import {
   setLocale,
   setLocation,
   setNotifyOnComplete,
+  setReadingWidth,
+  setSendKey,
   setThemePreference,
+  setTtsSpeed,
   setTtsVoice,
   setZoomPreference,
   useSettings,
+  type ReadingWidth,
+  type SendKey,
   type ThemePreference,
+  type TtsSpeed,
   type ZoomFactor,
 } from '../../services/settings.js'
 import {
@@ -45,6 +52,7 @@ import { Modal } from '../base/Modal.js'
 import { Select } from '../base/Select.js'
 import { showToast } from '../base/toastState.js'
 import { ApiKeyConfirm, ApiKeyField, useApiKeyEditor } from './ApiKeyField.js'
+import { PresetsSection } from './PresetsSection.js'
 import { closeSettings, useSettingsDialog, type SettingsSection } from './settingsDialogState.js'
 import styles from './Settings.module.css'
 
@@ -64,6 +72,11 @@ const sections: { value: SettingsSection; label: TranslationKey; icon: ReactNode
     icon: <IconSettingsOutline16 />,
   },
   { value: 'data', label: 'settingDialogAsideDataOptionLabel', icon: <IconDataOutline16 /> },
+  {
+    value: 'presets',
+    label: 'settingDialogAsidePresetsOptionLabel',
+    icon: <IconThinkOutline16 />,
+  },
 ]
 
 const SettingsContent = () => {
@@ -118,7 +131,9 @@ const SettingsContent = () => {
           ))}
         </div>
         <div role="tabpanel" className={styles.content}>
-          {section === 'general' ? (
+          {section === 'presets' ? (
+            <PresetsSection />
+          ) : section === 'general' ? (
             <>
               <ThemeSetting />
               <LocaleSetting />
@@ -127,6 +142,9 @@ const SettingsContent = () => {
               <CloseToTraySetting />
               <NotificationSetting />
               <ZoomSetting />
+              <ReadingWidthSetting />
+              <TtsSpeedSetting />
+              <SendKeySetting />
             </>
           ) : (
             <>
@@ -595,6 +613,73 @@ const ZoomSetting = () => {
             label: `${Math.round(factor * 100)}%`,
           }))}
           onChange={(value) => setZoomPreference(Number(value) as ZoomFactor)}
+        />
+      }
+    />
+  )
+}
+
+const ReadingWidthSetting = () => {
+  const t = useTranslate()
+  const readingWidth = useSettings((state) => state.readingWidth)
+  return (
+    <SettingCell
+      label={t('settingsReadingWidth')}
+      status={null}
+      action={
+        <Select
+          ariaLabel={t('settingsReadingWidth')}
+          value={readingWidth}
+          options={[
+            { value: 'comfortable', label: t('readingComfortable') },
+            { value: 'wide', label: t('readingWide') },
+          ]}
+          onChange={(value) => setReadingWidth(value as ReadingWidth)}
+        />
+      }
+    />
+  )
+}
+
+const TtsSpeedSetting = () => {
+  const t = useTranslate()
+  const ttsSpeed = useSettings((state) => state.ttsSpeed)
+  return (
+    <SettingCell
+      label={t('settingsTtsSpeed')}
+      status={null}
+      action={
+        <Select
+          ariaLabel={t('settingsTtsSpeed')}
+          value={String(ttsSpeed)}
+          options={[
+            { value: '0.8', label: t('ttsSpeedSlow') },
+            { value: '1', label: t('ttsSpeedNormal') },
+            { value: '1.2', label: t('ttsSpeedFast') },
+          ]}
+          onChange={(value) => setTtsSpeed(Number(value) as TtsSpeed)}
+        />
+      }
+    />
+  )
+}
+
+const SendKeySetting = () => {
+  const t = useTranslate()
+  const sendKey = useSettings((state) => state.sendKey)
+  return (
+    <SettingCell
+      label={t('settingsSendKey')}
+      status={null}
+      action={
+        <Select
+          ariaLabel={t('settingsSendKey')}
+          value={sendKey}
+          options={[
+            { value: 'enter', label: t('sendKeyEnter') },
+            { value: 'ctrlEnter', label: t('sendKeyCtrlEnter') },
+          ]}
+          onChange={(value) => setSendKey(value as SendKey)}
         />
       }
     />

@@ -54,7 +54,8 @@ export const synthesize = async (
   apiKey: string,
   text: string,
   voice: TtsVoice,
-  signal: AbortSignal
+  signal: AbortSignal,
+  speed = 1
 ): Promise<ReadableStream<Uint8Array>> => {
   if (!FEATURES.speech) {
     throw new ApiError('http', { key: 'featureUnavailableSpeech' })
@@ -62,7 +63,13 @@ export const synthesize = async (
   const response = await request(`${TOOLS_BASE_URL}/tts`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text, voice_id: voice, format: 'pcm', filter_markdown: true }),
+    body: JSON.stringify({
+      text,
+      voice_id: voice,
+      format: 'pcm',
+      filter_markdown: true,
+      speed,
+    }),
     signal,
   })
   if (!response.body) {

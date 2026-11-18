@@ -54,6 +54,7 @@ const Input = ({ sessionId }: { sessionId: string | null }) => {
   const importingHistory = useChatStore((state) => state.importingHistory)
   const isMobile = useIsMobile()
   const search = useSettings((state) => state.search)
+  const sendKey = useSettings((state) => state.sendKey)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const togglesRef = useRef<HTMLDivElement>(null)
@@ -195,7 +196,21 @@ const Input = ({ sessionId }: { sessionId: string | null }) => {
             }
           }}
           onKeyDown={(event) => {
-            if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
+            // 输入法确认候选词的 Enter 不能发送：部分浏览器合成的 isComposing 已为 false，
+            // 仍会带 keyCode 229；Shift+Enter 始终保留为换行。
+            if (
+              event.key !== 'Enter' ||
+              event.shiftKey ||
+              event.nativeEvent.isComposing ||
+              event.nativeEvent.keyCode === 229
+            ) {
+              return
+            }
+            const withModifier = event.ctrlKey || event.metaKey
+            if (
+              (sendKey === 'enter' && !withModifier) ||
+              (sendKey === 'ctrlEnter' && withModifier)
+            ) {
               event.preventDefault()
               send()
             }

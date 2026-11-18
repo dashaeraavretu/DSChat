@@ -1,7 +1,13 @@
 import clsx from 'clsx'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslate } from '../../i18n/index.js'
-import { IconPanelLeftOutline16, IconSettingsOutline16, NewChatIcon } from '../base/icons.js'
+import {
+  IconChevronDownOutline14,
+  IconPanelLeftOutline16,
+  IconSettingsOutline16,
+  IconThinkOutline16,
+  NewChatIcon,
+} from '../base/icons.js'
 import { setSiderCollapsed } from '../../services/settings.js'
 import { groupSessions } from '../../services/chat/sessionGroups.js'
 import { searchSessions, type SessionSearchResult } from '../../services/chat/search.js'
@@ -14,6 +20,7 @@ import {
 import type { SessionSummary } from '../../services/chat/types.js'
 import { Button } from '../base/Button.js'
 import { IconButton } from '../base/IconButton.js'
+import { Menu } from '../base/Menu.js'
 import { Modal } from '../base/Modal.js'
 import { showToast } from '../base/toastState.js'
 import { openSettings } from '../settings/settingsDialogState.js'
@@ -110,19 +117,43 @@ export const Sider = ({ mobile = false }: { mobile?: boolean }) => {
           onClick={() => (mobile ? closeMobileSider() : setSiderCollapsed(true))}
         />
       </div>
-      <button
-        type="button"
-        className={styles.newChat}
-        onClick={() => {
-          newChat()
-          closeMobileSider()
-        }}
-      >
-        <span className={styles.newChatIcon}>
-          <NewChatIcon />
-        </span>
-        {t('newChat')}
-      </button>
+      <div className={styles.newChatRow}>
+        <button
+          type="button"
+          className={styles.newChat}
+          onClick={() => {
+            newChat()
+            closeMobileSider()
+          }}
+        >
+          <span className={styles.newChatIcon}>
+            <NewChatIcon />
+          </span>
+          {t('newChat')}
+        </button>
+        <Menu
+          options={[
+            {
+              key: 'ephemeral',
+              label: t('ephemeralChat'),
+              icon: <IconThinkOutline16 />,
+              onSelect: () => {
+                newChat(true)
+                closeMobileSider()
+              },
+            },
+          ]}
+        >
+          {({ toggle }) => (
+            <IconButton
+              size="m"
+              icon={<IconChevronDownOutline14 />}
+              tooltip={t('newChatMenu')}
+              onClick={toggle}
+            />
+          )}
+        </Menu>
+      </div>
       <div className={styles.searchWrap}>
         <input
           ref={searchRef}

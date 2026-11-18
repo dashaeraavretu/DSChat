@@ -19,6 +19,9 @@ export type ApiKeyStorage = 'encrypted' | 'plaintext' | 'localStorage' | 'web'
 /** 可用缩放档位；与设置下拉一致 */
 export type ZoomFactor = 0.9 | 1 | 1.1 | 1.25
 const ZOOM_FACTORS: ZoomFactor[] = [0.9, 1, 1.1, 1.25]
+export type ReadingWidth = 'comfortable' | 'wide'
+export type TtsSpeed = 0.8 | 1 | 1.2
+export type SendKey = 'enter' | 'ctrlEnter'
 
 /**
  * 本机设置，存 localStorage：语言、主题、位置、朗读音色、深度思考与智能搜索开关、侧边栏收起状态。
@@ -40,6 +43,9 @@ type Settings = {
   notifyOnComplete: boolean
   /** 主窗口界面缩放 */
   zoomFactor: ZoomFactor
+  readingWidth: ReadingWidth
+  ttsSpeed: TtsSpeed
+  sendKey: SendKey
 }
 
 const KEYS = {
@@ -53,6 +59,9 @@ const KEYS = {
   siderCollapsed: 'chat-demo:sider-collapsed',
   notifyOnComplete: 'chat-demo:notify-on-complete',
   zoomFactor: 'chat-demo:zoom-factor',
+  readingWidth: 'chat-demo:reading-width',
+  ttsSpeed: 'chat-demo:tts-speed',
+  sendKey: 'chat-demo:send-key',
 } as const
 
 /** Electron preload 注入的桌面桥接；纯网页环境返回 undefined */
@@ -165,6 +174,9 @@ export const useSettings = create<Settings>(() => ({
   closeToTray: desktopBridge()?.desktopPrefs?.closeToTray === true,
   notifyOnComplete: read(KEYS.notifyOnComplete) !== 'false',
   zoomFactor: initialZoomFactor(),
+  readingWidth: read(KEYS.readingWidth) === 'wide' ? 'wide' : 'comfortable',
+  ttsSpeed: read(KEYS.ttsSpeed) === '0.8' ? 0.8 : read(KEYS.ttsSpeed) === '1.2' ? 1.2 : 1,
+  sendKey: read(KEYS.sendKey) === 'ctrlEnter' ? 'ctrlEnter' : 'enter',
 }))
 
 export const setLocale = (locale: Locale) => {
@@ -323,6 +335,21 @@ export const setSearch = (search: boolean) => {
 export const setSiderCollapsed = (siderCollapsed: boolean) => {
   write(KEYS.siderCollapsed, String(siderCollapsed))
   useSettings.setState({ siderCollapsed })
+}
+
+export const setReadingWidth = (readingWidth: ReadingWidth) => {
+  write(KEYS.readingWidth, readingWidth)
+  useSettings.setState({ readingWidth })
+}
+
+export const setTtsSpeed = (ttsSpeed: TtsSpeed) => {
+  write(KEYS.ttsSpeed, String(ttsSpeed))
+  useSettings.setState({ ttsSpeed })
+}
+
+export const setSendKey = (sendKey: SendKey) => {
+  write(KEYS.sendKey, sendKey)
+  useSettings.setState({ sendKey })
 }
 
 export const setNotifyOnComplete = (notifyOnComplete: boolean) => {
