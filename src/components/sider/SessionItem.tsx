@@ -57,9 +57,22 @@ export const SessionItem = memo(function SessionItem({
   return (
     <div
       className={clsx(styles.item, active && styles.active)}
+      role="button"
+      tabIndex={0}
+      aria-current={active ? 'true' : undefined}
       onClick={() => {
         selectSession(session.id)
         closeMobileSider()
+      }}
+      onKeyDown={(event) => {
+        if (event.target !== event.currentTarget) {
+          return
+        }
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault()
+          selectSession(session.id)
+          closeMobileSider()
+        }
       }}
     >
       <div className={styles.title}>{displayTitle}</div>
