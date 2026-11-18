@@ -1,4 +1,5 @@
 import type { TranslationMessage } from '../../i18n/index.js'
+import type { PresetSnapshot } from '../presets.js'
 import type { ApiErrorKind } from '../api/client.js'
 import type {
   ChatModel,
@@ -116,10 +117,19 @@ export type Session = {
   messages: Message[]
   /** undefined 表示线性消息列表；null 表示空会话。 */
   rootMessageId?: string | null
+  /** 创建时固化的预设快照；之后修改预设不影响本会话 */
+  preset?: PresetSnapshot
+  /** 置顶显示在列表顶部 */
+  pinned?: boolean
+  /** 临时会话：只保存在内存，不写历史/不进搜索 */
+  ephemeral?: boolean
 }
 
 /** 会话列表元数据；消息只在打开会话时加载。 */
-export type SessionSummary = Pick<Session, 'id' | 'title' | 'createdAt' | 'updatedAt'>
+export type SessionSummary = Pick<Session, 'id' | 'title' | 'createdAt' | 'updatedAt'> & {
+  pinned?: boolean
+  ephemeral?: boolean
+}
 
 /** 显式提取字段，避免将完整会话的消息带进列表。 */
 export const toSessionSummary = (session: SessionSummary): SessionSummary => ({
@@ -127,4 +137,6 @@ export const toSessionSummary = (session: SessionSummary): SessionSummary => ({
   title: session.title,
   createdAt: session.createdAt,
   updatedAt: session.updatedAt,
+  ...(session.pinned ? { pinned: true } : {}),
+  ...(session.ephemeral ? { ephemeral: true } : {}),
 })

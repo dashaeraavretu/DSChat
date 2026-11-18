@@ -30,12 +30,36 @@
   }
 }
 
+.titleRow {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
 .title {
   flex: 1;
   min-width: 0;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
+  line-height: 18px;
+}
+
+.pin {
+  display: inline-flex;
+  flex-shrink: 0;
+  color: var(--dsw-alias-brand-text);
+}
+
+.badge {
+  flex-shrink: 0;
+  padding: 0 6px;
+  border-radius: 6px;
+  background-color: var(--dsw-alias-button-ghost-active-fill);
+  color: var(--dsw-alias-brand-text);
+  font-size: 11px;
   line-height: 18px;
 }
 

@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { translate } from '../../i18n/index.js'
 import { createId } from '../../utils/id.js'
+import { getDefaultPreset, snapshotPreset } from '../presets.js'
 import { ApiError, streamMessage } from '../api/client.js'
 import { API_MODEL, FEATURES } from '../buildInfo.js'
 import type { ChatModel, CreateMessageRequest } from '../api/types.js'
@@ -77,6 +78,8 @@ type ChatState = {
   sessionSaveErrors: Record<string, boolean>
   /** null 表示新对话（欢迎页） */
   activeId: string | null
+  /** 下一次新对话发送后是否创建临时会话 */
+  ephemeralNewChat: boolean
   /** 正在生成回复的会话 */
   streaming: Record<string, AbortController>
 }
@@ -90,13 +93,16 @@ export const useChatStore = create<ChatState>(() => ({
   sessionLoadErrors: {},
   sessionSaveErrors: {},
   activeId: null,
+  ephemeralNewChat: false,
   streaming: {},
 }))
 
 const { getState: get, setState: set } = useChatStore
 
 const sortSessions = (sessions: SessionSummary[]) =>
-  [...sessions].sort((a, b) => b.updatedAt - a.updatedAt)
+  [...sessions].sort(
+    (a, b) => Number(b.pinned === true) - Number(a.pinned === true) || b.updatedAt - a.updatedAt
+  )
 
 const getSession = (id: string) => {
   const cache = get().sessionCache
@@ -109,7 +115,11 @@ const getStreamController = (id: string) => {
 }
 
 const sameSummary = (a: SessionSummary, b: SessionSummary) =>
-  a.title === b.title && a.createdAt === b.createdAt && a.updatedAt === b.updatedAt
+  a.title === b.title &&
+  a.createdAt === b.createdAt &&
+  a.updatedAt === b.updatedAt &&
+  a.pinned === b.pinned &&
+  a.ephemeral === b.ephemeral
 
 const sessionAccess = new Map<string, number>()
 const unsavedSessions = new Set<string>()
@@ -187,6 +197,9 @@ const updateReply = (sessionId: string, reply: AssistantMessage) =>
 
 const persist = (sessionId: string) => {
   const session = getSession(sessionId)
+  if (session?.ephemeral) {
+    return
+  }
   if (session) {
     unsavedSessions.add(sessionId)
     if (deletingSessions.has(sessionId)) {
@@ -446,11 +459,20 @@ export const replaceHistory = async (write: () => Promise<void>): Promise<number
   }
 }
 
-export const newChat = () => {
+export const newChat = (ephemeral = false) => {
   if (!get().importingHistory) {
-    set({ activeId: null })
+    set({ activeId: null, ephemeralNewChat: ephemeral })
     trimSessionCache()
   }
+}
+
+/** 置顶/取消置顶；临时会话只改内存。 */
+export const toggleSessionPin = (sessionId: string) => {
+  if (get().importingHistory || deletingSessions.has(sessionId)) {
+    return
+  }
+  updateSession(sessionId, (session) => ({ ...session, pinned: !session.pinned }))
+  persist(sessionId)
 }
 
 export const selectSession = (id: string) => {
@@ -569,6 +591,7 @@ export const sendMessage = (targetSessionId: string | null) => {
     return false
   }
   if (sessionId === null) {
+    const preset = getDefaultPreset()
     const session: Session = {
       id: createId(),
       title: '',
@@ -576,6 +599,8 @@ export const sendMessage = (targetSessionId: string | null) => {
       updatedAt: now,
       messages: [],
       rootMessageId: null,
+      ...(preset ? { preset: snapshotPreset(preset) } : {}),
+      ...(get().ephemeralNewChat ? { ephemeral: true } : {}),
     }
     sessionId = session.id
     touchSession(session.id)
@@ -583,6 +608,7 @@ export const sendMessage = (targetSessionId: string | null) => {
       sessions: [toSessionSummary(session), ...state.sessions],
       sessionCache: { ...state.sessionCache, [session.id]: session },
       activeId: session.id,
+      ephemeralNewChat: false,
     }))
   }
   const current = getSession(sessionId)
@@ -1063,7 +1089,7 @@ const streamReply = async (sessionId: string, initial: AssistantMessage, request
           useSettings.getState().apiKey ?? '',
           {
             model: initial.model ?? MODEL,
-            system: SYSTEM_PROMPT,
+            system: getSession(sessionId)?.preset?.system?.trim() || SYSTEM_PROMPT,
             messages,
             thinking: { type: initial.thinking ? 'enabled' : 'disabled' },
             safety_check: SAFETY_CHECK,
