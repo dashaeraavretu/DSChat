@@ -75,6 +75,7 @@
       "dist/**/*",
       "electron/**/*",
       "build/**/*",
+      "!node_modules/**/*",
       "!**/*.map"
     ],
     "extraResources": [
