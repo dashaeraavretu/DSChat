@@ -392,6 +392,35 @@ function registerIpc() {
     }
   })
 
+  ipcMain.handle('proxy:apply', async (event, payload) => {
+    const senderUrl = event.senderFrame?.url ?? event.sender.getURL()
+    if (!isTrustedPageUrl(senderUrl)) return false
+    const mode = payload?.mode
+    try {
+      if (mode === 'system') {
+        await session.defaultSession.setProxy({ mode: 'system' })
+      } else if (mode === 'http' || mode === 'socks5') {
+        const host = typeof payload.host === 'string' ? payload.host.trim() : ''
+        const port = Number(payload.port)
+        if (!host || !/^[\w.-]+$/.test(host) || !Number.isInteger(port) || port < 1 || port > 65535) {
+          return false
+        }
+        await session.defaultSession.setProxy({
+          mode: 'fixed_servers',
+          proxyRules: `${mode}://${host}:${port}`,
+          proxyBypassRules: '<local>',
+        })
+      } else {
+        return false
+      }
+      await session.defaultSession.closeAllConnections()
+      return true
+    } catch (error) {
+      logger?.error('设置代理失败', error)
+      return false
+    }
+  })
+
   ipcMain.handle('app:notify-done', (event, payload) => {
     const senderUrl = event.senderFrame?.url ?? event.sender.getURL()
     if (!isTrustedPageUrl(senderUrl)) return false
@@ -400,7 +429,7 @@ function registerIpc() {
     const title = typeof payload?.title === 'string' ? payload.title : APP_NAME
     const body = typeof payload?.body === 'string' ? payload.body : ''
     try {
-      const notification = new Notification({ title, body })
+      const notification = new Notification({ title, body, silent: payload?.silent === true })
       notification.on('click', () => {
         mainWindow?.show()
         mainWindow?.focus()

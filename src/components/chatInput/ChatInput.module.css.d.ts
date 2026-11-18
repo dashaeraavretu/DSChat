@@ -4,6 +4,11 @@ declare const styles: {
   readonly "home": string;
   readonly "attachments": string;
   readonly "attachment": string;
+  readonly "quote": string;
+  readonly "quoteHeader": string;
+  readonly "quoteLabel": string;
+  readonly "quoteRemove": string;
+  readonly "quoteText": string;
   readonly "remove": string;
   readonly "uploading": string;
   readonly "spin": string;

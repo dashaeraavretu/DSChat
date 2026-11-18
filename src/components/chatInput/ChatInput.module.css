@@ -63,6 +63,73 @@
   }
 }
 
+/* 引用块：固定在输入框顶部，自身限高滚动，不挤压正文输入区 */
+.quote {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  gap: 2px;
+  min-width: 0;
+  box-sizing: border-box;
+  margin: 12px 12px 0;
+  padding: 8px 10px;
+  border-left: 3px solid var(--dsw-alias-brand-text);
+  border-radius: var(--ds-radius-8);
+  background-color: var(--dsw-alias-bg-layer-3);
+  cursor: default;
+}
+
+.quoteHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+
+.quoteLabel {
+  overflow: hidden;
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 500;
+  color: var(--dsw-alias-label-tertiary);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.quoteRemove {
+  flex-shrink: 0;
+  margin: -4px -6px -4px 0;
+}
+
+.quoteText {
+  max-height: 96px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--dsw-alias-label-secondary);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* 窄窗口下进一步限制预览高度，保证输入区高度不被引用块挤压 */
+@media (max-width: 900px) {
+  .quoteText {
+    max-height: 60px;
+  }
+}
+
+@media not all and (min-width: 700px) {
+  .quote {
+    margin-top: 8px;
+  }
+
+  .quoteText {
+    max-height: 40px;
+  }
+}
+
 .uploading {
   position: absolute;
   inset: 0;

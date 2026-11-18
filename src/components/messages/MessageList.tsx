@@ -12,6 +12,7 @@ import type { Session } from '../../services/chat/types.js'
 import { closeSearchPanel } from '../search/searchPanelState.js'
 import { AssistantMessage } from './AssistantMessage.js'
 import { ScrollToBottomContext } from './scrollContext.js'
+import { QuoteSelectionBar } from './QuoteSelectionBar.js'
 import { UserMessage } from './UserMessage.js'
 import type { Message } from '../../services/chat/types.js'
 
@@ -179,6 +180,7 @@ export const MessageList = ({
         </div>
         {footer}
       </div>
+      <QuoteSelectionBar sessionId={session.id} containerRef={contentRef} />
     </ScrollToBottomContext.Provider>
   )
 }

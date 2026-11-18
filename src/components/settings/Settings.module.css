@@ -754,3 +754,16 @@
   font-size: 12px;
   line-height: 18px;
 }
+
+.proxyFields {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  min-width: 0;
+}
+
+.proxyFields input {
+  width: 110px;
+}

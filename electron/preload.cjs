@@ -108,6 +108,19 @@ contextBridge.exposeInMainWorld('desktop', {
       return false
     }
   },
+  async applyProxy(payload) {
+    if (!payload || typeof payload !== 'object') return false
+    try {
+      return (await ipcRenderer.invoke('proxy:apply', {
+        mode: payload.mode,
+        host: typeof payload.host === 'string' ? payload.host : '',
+        port: typeof payload.port === 'string' ? payload.port : '',
+      })) === true
+    } catch (error) {
+      console.error('[preload] 应用代理失败：', error)
+      return false
+    }
+  },
   async notifyGenerationDone(payload) {
     if (!payload || typeof payload.title !== 'string' || typeof payload.body !== 'string') {
       return false
@@ -117,6 +130,7 @@ contextBridge.exposeInMainWorld('desktop', {
         (await ipcRenderer.invoke('app:notify-done', {
           title: payload.title.slice(0, 200),
           body: payload.body.slice(0, 500),
+          silent: payload.silent === true,
         })) === true
       )
     } catch (error) {

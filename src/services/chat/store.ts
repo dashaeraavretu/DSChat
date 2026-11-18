@@ -19,6 +19,7 @@ import {
   prepareDraftMessage,
 } from './drafts.js'
 import { createLatestReminder } from './latestReminder.js'
+import { withQuote, type Quote } from '../quote.js'
 import {
   applyEvent,
   canContinueReply,
@@ -616,7 +617,7 @@ export const sendMessage = (targetSessionId: string | null) => {
   if (!prepared) {
     return false
   }
-  const { text, files } = prepared
+  const { text, files, quote } = prepared
   const now = Date.now()
   let sessionId = targetSessionId
   if (
@@ -678,7 +679,8 @@ export const sendMessage = (targetSessionId: string | null) => {
   }
   persist(sessionId)
   clearSentDraft(targetSessionId)
-  void streamReply(sessionId, reply, { history, question })
+  // 引用只进入本次请求快照，question 消息本身不保存引用文本。
+  void streamReply(sessionId, reply, { history, question, ...(quote ? { quote } : {}) })
   return true
 }
 
@@ -873,7 +875,13 @@ export const retryReply = (sessionId: string, messageId: string) => {
   })
 }
 
-type Request = { history: Message[]; question: UserMessage; prefix?: AssistantMessage }
+type Request = {
+  history: Message[]
+  question: UserMessage
+  prefix?: AssistantMessage
+  /** 本轮提问附带的引用；仅修改请求内容，不写入消息树 */
+  quote?: Quote
+}
 
 /** 把补传得到的 serverId 写回会话里所有引用同一附件的消息（编辑、重新生成会共用附件） */
 const saveServerIds = (sessionId: string, serverIds: Map<string, string>) => {
@@ -928,6 +936,7 @@ const refreshRequest = (sessionId: string, request: Request): Request => {
     history: request.history.map(pick),
     question: pick(request.question),
     prefix: request.prefix,
+    quote: request.quote,
   }
 }
 
@@ -996,6 +1005,7 @@ const prepareFiles = async (sessionId: string, request: Request, signal: AbortSi
     history: request.history.map(resolve),
     question: resolve(request.question),
     prefix: request.prefix,
+    quote: request.quote,
   }
 }
 
@@ -1130,7 +1140,8 @@ const streamReply = async (sessionId: string, initial: AssistantMessage, request
                 ? renderPrompt(preset.system, { char: preset.name, original: SYSTEM_PROMPT })
                 : SYSTEM_PROMPT
             })(),
-            messages,
+            // 只为本轮提问的请求快照补引用上下文，不动消息树和历史轮次。
+            messages: request.quote ? withQuote(messages, request.quote) : messages,
             thinking: { type: initial.thinking ? 'enabled' : 'disabled' },
             safety_check: SAFETY_CHECK,
             tools: serverTools(initial.search ?? false),
@@ -1231,6 +1242,7 @@ const streamReply = async (sessionId: string, initial: AssistantMessage, request
       void window.desktop?.notifyGenerationDone?.({
         title: translate('appName'),
         body: translate('generationCompleteBody', { title }),
+        silent: !useSettings.getState().notifySound,
       })
     }
   }

@@ -1,15 +1,21 @@
 import { useTranslate } from '../../i18n/index.js'
 import clsx from 'clsx'
 import { memo } from 'react'
-import { IconRefreshOutline16, IconWarningOutline16 } from '../base/icons.js'
+import {
+  IconDownloadOutline16,
+  IconRefreshOutline16,
+  IconWarningOutline16,
+} from '../base/icons.js'
 import { describeReply } from '../../services/chat/describe.js'
 import { canContinueReply } from '../../services/chat/reply.js'
 import { continueReply, regenerateReply, retryReply } from '../../services/chat/store.js'
 import { stopReadAloud } from '../../services/speech/readAloud.js'
 import type { AssistantMessage as AssistantMessageType } from '../../services/chat/types.js'
 import { openSettings } from '../settings/settingsDialogState.js'
+import { showToast } from '../base/toastState.js'
 import { useSettings } from '../../services/settings.js'
 import { PresetDecoration } from '../session/PresetDecoration.js'
+import { downloadSessionImage } from '../../services/chat/exportImage.js'
 import { IconButton } from '../base/IconButton.js'
 import { Button } from '../base/Button.js'
 import { Markdown } from '../markdown/Markdown.js'
@@ -76,7 +82,7 @@ export const AssistantMessage = memo(function AssistantMessage({
     minute: '2-digit',
   }).format(message.createdAt)
   return (
-    <div className={styles.message}>
+    <div className={styles.message} data-quote-message-id={message.id} data-quote-role="assistant">
       {refused ? null : (
         <ReplyArea
           message={message}
@@ -195,6 +201,16 @@ export const AssistantMessage = memo(function AssistantMessage({
             {responseText && !refused ? (
               <ReadAloudButton messageId={message.id} text={responseText} />
             ) : null}
+            <IconButton
+              icon={<IconDownloadOutline16 />}
+              tooltip={t('exportImage')}
+              tooltipPlacement="bottom"
+              onClick={() => {
+                void downloadSessionImage(sessionId)
+                  .then(() => showToast({ key: 'exportImageDone' }))
+                  .catch(() => showToast({ key: 'exportImageFailed', type: 'error' }))
+              }}
+            />
             <IconButton
               icon={<IconRefreshOutline16 />}
               tooltip={t('regenerate')}

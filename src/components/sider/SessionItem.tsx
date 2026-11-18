@@ -9,6 +9,7 @@ import {
   IconTrashOutline16,
 } from '../base/icons.js'
 import { exportSessionMarkdown } from '../../services/chat/exportMarkdown.js'
+import { downloadSessionImage } from '../../services/chat/exportImage.js'
 import {
   renameSession,
   selectSession,
@@ -107,6 +108,16 @@ export const SessionItem = memo(function SessionItem({
             ...(session.ephemeral
               ? []
               : [
+                  {
+                    key: 'export-image',
+                    label: t('exportImage'),
+                    icon: <IconDownloadOutline16 />,
+                    onSelect: () => {
+                      void downloadSessionImage(session.id)
+                        .then(() => showToast({ key: 'exportImageDone' }))
+                        .catch(() => showToast({ key: 'exportImageFailed', type: 'error' }))
+                    },
+                  },
                   {
                     key: 'export-markdown',
                     label: t('exportMarkdown'),

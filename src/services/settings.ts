@@ -23,6 +23,7 @@ export type ReadingWidth = 'comfortable' | 'wide'
 export type TtsSpeed = 0.8 | 1 | 1.2
 export type SendKey = 'enter' | 'ctrlEnter'
 export type Appearance = 'original' | 'tui' | 'fish' | 'paper'
+export type ProxyMode = 'system' | 'http' | 'socks5'
 
 /**
  * 本机设置，存 localStorage：语言、主题、位置、朗读音色、深度思考与智能搜索开关、侧边栏收起状态。
@@ -50,6 +51,10 @@ type Settings = {
   appearance: Appearance
   showMascot: boolean
   showInputCount: boolean
+  notifySound: boolean
+  proxyMode: ProxyMode
+  proxyHost: string
+  proxyPort: string
 }
 
 const KEYS = {
@@ -69,6 +74,10 @@ const KEYS = {
   appearance: 'chat-demo:appearance',
   showMascot: 'chat-demo:show-mascot',
   showInputCount: 'chat-demo:show-input-count',
+  notifySound: 'chat-demo:notify-sound',
+  proxyMode: 'chat-demo:proxy-mode',
+  proxyHost: 'chat-demo:proxy-host',
+  proxyPort: 'chat-demo:proxy-port',
 } as const
 
 /** Electron preload 注入的桌面桥接；纯网页环境返回 undefined */
@@ -190,6 +199,13 @@ export const useSettings = create<Settings>(() => ({
   })(),
   showMascot: read(KEYS.showMascot) !== 'false',
   showInputCount: read(KEYS.showInputCount) !== 'false',
+  notifySound: read(KEYS.notifySound) !== 'false',
+  proxyMode: (() => {
+    const value = read(KEYS.proxyMode)
+    return value === 'http' || value === 'socks5' ? value : 'system'
+  })(),
+  proxyHost: read(KEYS.proxyHost) ?? '',
+  proxyPort: read(KEYS.proxyPort) ?? '',
 }))
 
 export const setLocale = (locale: Locale) => {
@@ -378,6 +394,41 @@ export const setShowMascot = (showMascot: boolean) => {
 export const setShowInputCount = (showInputCount: boolean) => {
   write(KEYS.showInputCount, String(showInputCount))
   useSettings.setState({ showInputCount })
+}
+
+export const setNotifySound = (notifySound: boolean) => {
+  write(KEYS.notifySound, String(notifySound))
+  useSettings.setState({ notifySound })
+}
+
+export const applyProxyPreference = (): void => {
+  const bridge = desktopBridge()
+  if (!bridge?.applyProxy) {
+    return
+  }
+  const { proxyMode, proxyHost, proxyPort } = useSettings.getState()
+  void bridge.applyProxy({
+    mode: proxyMode,
+    host: proxyHost,
+    port: proxyPort,
+  })
+}
+
+export const setProxyPreference = (patch: {
+  mode?: ProxyMode
+  host?: string
+  port?: string
+}) => {
+  const next = {
+    proxyMode: patch.mode ?? useSettings.getState().proxyMode,
+    proxyHost: patch.host ?? useSettings.getState().proxyHost,
+    proxyPort: patch.port ?? useSettings.getState().proxyPort,
+  }
+  write(KEYS.proxyMode, next.proxyMode)
+  write(KEYS.proxyHost, next.proxyHost)
+  write(KEYS.proxyPort, next.proxyPort)
+  useSettings.setState(next)
+  applyProxyPreference()
 }
 
 export const setNotifyOnComplete = (notifyOnComplete: boolean) => {

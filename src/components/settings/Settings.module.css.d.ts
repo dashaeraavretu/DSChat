@@ -65,6 +65,7 @@ declare const styles: {
   readonly "presetPreview": string;
   readonly "presetEditor": string;
   readonly "presetEditorMain": string;
+  readonly "proxyFields": string;
 };
 export = styles;
 

@@ -1,6 +1,7 @@
 import clsx from 'clsx'
 import { memo, useCallback, useEffect, useLayoutEffect, useRef } from 'react'
 import {
+  IconCloseOutline16,
   IconGlobeLanguageOutline14,
   IconPaperclipOutline16,
   IconSendOutline16,
@@ -17,9 +18,11 @@ import {
   prepareDraftMessage,
   removeDraftAttachment,
   retryDraftAttachment,
+  setDraftQuote,
   setDraftText,
   useDrafts,
 } from '../../services/chat/drafts.js'
+import { quoteText } from '../../services/quote.js'
 import { stopReadAloud } from '../../services/speech/readAloud.js'
 import { FEATURES } from '../../services/buildInfo.js'
 import { IconButton } from '../base/IconButton.js'
@@ -44,7 +47,7 @@ export const ChatInput = memo(function ChatInput({ sessionId }: { sessionId: str
 const Input = ({ sessionId }: { sessionId: string | null }) => {
   const t = useTranslate()
   const draft = useDrafts((state) => state.drafts.get(sessionId) ?? EMPTY_DRAFT)
-  const { text, attachments } = draft
+  const { text, attachments, quote } = draft
   const setText = (value: string) => setDraftText(sessionId, value)
   const draftReady = useUploads((state) => prepareDraftMessage(draft, state.tasks) !== null)
   const streaming = useChatStore(
@@ -189,6 +192,24 @@ const Input = ({ sessionId }: { sessionId: string | null }) => {
       }}
     >
       <DraftAttachments items={attachments} onRetry={retryFile} onRemove={removeFile} />
+      {quote ? (
+        // 引用只属于当前草稿：取消后恢复输入焦点，发送成功后随草稿一起清空。
+        <div className={styles.quote} role="note" aria-label={quoteText(t, 'quoteSource')}>
+          <div className={styles.quoteHeader}>
+            <span className={styles.quoteLabel}>{quoteText(t, 'quoteSource')}</span>
+            <IconButton
+              className={styles.quoteRemove}
+              icon={<IconCloseOutline16 />}
+              tooltip={quoteText(t, 'quoteRemove')}
+              onClick={() => {
+                setDraftQuote(sessionId, null)
+                textareaRef.current?.focus({ preventScroll: true })
+              }}
+            />
+          </div>
+          <div className={styles.quoteText}>{quote.text}</div>
+        </div>
+      ) : null}
       <div className={styles.textareaWrapper}>
         <textarea
           ref={textareaRef}

@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { useTranslate } from '../i18n/index.js'
 import {
+  applyProxyPreference,
   applyZoomPreference,
   isDesktopApp,
   migrateLegacyApiKey,
@@ -154,6 +155,7 @@ export const App = () => {
 
   useEffect(() => {
     applyZoomPreference()
+    applyProxyPreference()
   }, [])
 
   // 断网/恢复只提示，不自动重连

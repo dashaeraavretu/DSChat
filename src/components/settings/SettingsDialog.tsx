@@ -28,9 +28,11 @@ import {
   setLocation,
   setAppearance,
   setNotifyOnComplete,
+  setNotifySound,
   setReadingWidth,
   setSendKey,
   setShowInputCount,
+  setProxyPreference,
   setShowMascot,
   setThemePreference,
   setTtsSpeed,
@@ -38,6 +40,7 @@ import {
   setZoomPreference,
   useSettings,
   type Appearance,
+  type ProxyMode,
   type ReadingWidth,
   type SendKey,
   type ThemePreference,
@@ -145,11 +148,13 @@ const SettingsContent = () => {
               <LocationSetting />
               <CloseToTraySetting />
               <NotificationSetting />
+              <NotificationSoundSetting />
               <ZoomSetting />
               <AppearanceSetting />
               <MascotSetting />
               <InputCountSetting />
               <ReadingWidthSetting />
+              <ProxySetting />
               <TtsSpeedSetting />
               <SendKeySetting />
             </>
@@ -569,6 +574,79 @@ const CloseToTraySetting = () => {
         >
           <span className={styles.switchThumb} />
         </button>
+      }
+    />
+  )
+}
+
+const NotificationSoundSetting = () => {
+  const t = useTranslate()
+  const notifySound = useSettings((state) => state.notifySound)
+  return (
+    <SettingCell
+      label={t('settingsNotifySound')}
+      description={t('settingsNotifySoundDescription')}
+      status={null}
+      action={
+        <button
+          type="button"
+          role="switch"
+          aria-checked={notifySound}
+          aria-label={t('settingsNotifySound')}
+          className={clsx(styles.switch, notifySound && styles.switchOn)}
+          onClick={() => setNotifySound(!notifySound)}
+        >
+          <span className={styles.switchThumb} />
+        </button>
+      }
+    />
+  )
+}
+
+const ProxySetting = () => {
+  const t = useTranslate()
+  const mode = useSettings((state) => state.proxyMode)
+  const host = useSettings((state) => state.proxyHost)
+  const port = useSettings((state) => state.proxyPort)
+  const change = (patch: { mode?: ProxyMode; host?: string; port?: string }) => {
+    setProxyPreference(patch)
+    showToast({ key: 'proxyRestartHint' })
+  }
+  return (
+    <SettingCell
+      label={t('settingsProxy')}
+      description={t('settingsProxyDescription')}
+      status={null}
+      action={
+        <div className={styles.proxyFields}>
+          <Select
+            ariaLabel={t('settingsProxy')}
+            value={mode}
+            options={[
+              { value: 'system', label: t('proxySystem') },
+              { value: 'http', label: t('proxyHttp') },
+              { value: 'socks5', label: t('proxySocks5') },
+            ]}
+            onChange={(value) => change({ mode: value as ProxyMode })}
+          />
+          {mode !== 'system' ? (
+            <>
+              <input
+                className={styles.presetInput}
+                placeholder={t('proxyHost')}
+                value={host}
+                onChange={(event) => change({ host: event.target.value })}
+              />
+              <input
+                className={styles.presetInput}
+                placeholder={t('proxyPort')}
+                inputMode="numeric"
+                value={port}
+                onChange={(event) => change({ port: event.target.value })}
+              />
+            </>
+          ) : null}
+        </div>
       }
     />
   )
