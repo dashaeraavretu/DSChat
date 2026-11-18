@@ -194,7 +194,10 @@ function toggleWindow() {
 
 function createTray() {
   if (tray) return
-  const image = nativeImage.createFromPath(path.join(app.getAppPath(), 'build', 'icon.png'))
+  const trayPath = path.join(app.getAppPath(), 'build', 'tray.png')
+  const image = nativeImage.createFromPath(
+    existsSync(trayPath) ? trayPath : path.join(app.getAppPath(), 'build', 'icon.png')
+  )
   if (image.isEmpty()) {
     logger?.warn('托盘图标缺失，跳过托盘创建')
     return
@@ -688,6 +691,7 @@ function createWindow() {
     title: APP_NAME,
     backgroundColor: '#0b1b33',
     show: false,
+    autoHideMenuBar: !DEV,
     icon: existsSync(iconPath) ? iconPath : undefined,
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
@@ -699,6 +703,9 @@ function createWindow() {
   })
 
   mainWindow = win
+  if (!DEV) {
+    win.setMenuBarVisibility(false)
+  }
   win.once('ready-to-show', () => {
     if (windowState.maximized) {
       win.maximize()
@@ -739,6 +746,24 @@ function createWindow() {
   })
 
   wireWindowSecurity(win)
+
+  if (!DEV) {
+    // 生产环境禁用 DevTools 快捷键；菜单快捷键仍由 application menu 注册
+    win.webContents.on('before-input-event', (event, input) => {
+      if (input.type !== 'keyDown') return
+      const key = String(input.key || '').toLowerCase()
+      const blocked =
+        key === 'f12' ||
+        (input.control && input.shift && (key === 'i' || key === 'j'))
+      if (blocked) {
+        event.preventDefault()
+        console.warn('[window] 已拦截 DevTools 快捷键')
+      }
+    })
+    win.webContents.on('devtools-opened', () => {
+      win.webContents.closeDevTools()
+    })
+  }
 
   if (SMOKE) {
     const timer = setTimeout(() => {

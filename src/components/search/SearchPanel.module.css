@@ -46,7 +46,7 @@
 .item {
   margin-bottom: 6px;
   padding: 12px;
-  border-radius: 12px;
+  border-radius: var(--ds-radius-12);
   transition: background-color var(--ds-transition-duration) var(--ds-ease-in-out);
 
   &:hover {

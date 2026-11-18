@@ -1,0 +1,209 @@
+/* 可选外观预设：只覆盖 CSS variables / token，不改 DOM 与布局。
+   默认 original 不写任何覆盖，保持 0.2.1 原版外观。 */
+
+body[data-ds-preset='tui'] {
+  --dsw-alias-bg-base: #fbf1c7;
+  --dsw-alias-bg-layer-2: #f2e5bc;
+  --dsw-alias-bg-layer-3: #ebdbb2;
+  --dsw-alias-label-primary: #3c3836;
+  --dsw-alias-label-secondary: #504945;
+  --dsw-alias-label-tertiary: #665c54;
+  --dsw-alias-label-caption: #7c6f64;
+  --dsw-alias-brand-primary: #af3a03;
+  --dsw-alias-brand-text: #9d0006;
+  --dsw-alias-button-primary-fill: #af3a03;
+  --dsw-alias-label-primary-foreground: #fbf1c7;
+  --dsw-alias-label-primary-inverted: #fbf1c7;
+  --dsw-alias-border-l1: rgba(60, 56, 54, 0.14);
+  --dsw-alias-border-l2: rgba(60, 56, 54, 0.24);
+  --dsw-alias-border-l3: rgba(60, 56, 54, 0.34);
+  --dsw-alias-interactive-bg-hover: rgba(60, 56, 54, 0.09);
+  --dsw-alias-button-ghost-active-fill: rgba(175, 58, 3, 0.14);
+  --dsw-alias-state-error-primary: #9d0006;
+  --dsw-specific-sidebar-fill: #f2e5bc;
+  --dsw-specific-menu: #f2e5bc;
+  --dsw-specific-login-input: #f2e5bc;
+  --dsw-specific-input-major: #fbf1c7;
+  --ds-radius-1: 2px;
+  --ds-radius-2: 2px;
+  --ds-radius-4: 2px;
+  --ds-radius-6: 2px;
+  --ds-radius-8: 2px;
+  --ds-radius-10: 2px;
+  --ds-radius-11: 2px;
+  --ds-radius-12: 4px;
+  --ds-radius-14: 4px;
+  --ds-radius-16: 4px;
+  --ds-radius-18: 4px;
+  --ds-radius-20: 4px;
+  --ds-radius-22: 4px;
+  --ds-radius-24: 4px;
+  --ds-radius-28: 4px;
+  --ds-radius-40: 4px;
+  --ds-radius-100: 4px;
+  --ds-radius-4096: 4px;
+}
+
+body[data-ds-preset='tui'][data-ds-dark-theme] {
+  --dsw-alias-bg-base: #1d2021;
+  --dsw-alias-bg-layer-2: #282828;
+  --dsw-alias-bg-layer-3: #32302f;
+  --dsw-alias-label-primary: #ebdbb2;
+  --dsw-alias-label-secondary: #d5c4a1;
+  --dsw-alias-label-tertiary: #bdae93;
+  --dsw-alias-label-caption: #a89984;
+  --dsw-alias-brand-primary: #fe8019;
+  --dsw-alias-brand-text: #fabd2f;
+  --dsw-alias-button-primary-fill: #d65d0e;
+  --dsw-alias-label-primary-foreground: #1d2021;
+  --dsw-alias-label-primary-inverted: #1d2021;
+  --dsw-alias-border-l1: rgba(235, 219, 178, 0.12);
+  --dsw-alias-border-l2: rgba(235, 219, 178, 0.2);
+  --dsw-alias-border-l3: rgba(235, 219, 178, 0.28);
+  --dsw-alias-interactive-bg-hover: rgba(235, 219, 178, 0.1);
+  --dsw-alias-button-ghost-active-fill: rgba(254, 128, 25, 0.18);
+  --dsw-alias-state-error-primary: #fb4934;
+  --dsw-specific-sidebar-fill: #282828;
+  --dsw-specific-menu: #32302f;
+  --dsw-specific-login-input: #282828;
+  --dsw-specific-input-major: #1d2021;
+}
+
+body[data-ds-preset='fish'] {
+  --dsw-alias-bg-base: #f2fafb;
+  --dsw-alias-bg-layer-2: #e7f5f7;
+  --dsw-alias-bg-layer-3: #dcf0f3;
+  --dsw-alias-label-primary: #073b46;
+  --dsw-alias-label-secondary: #28545c;
+  --dsw-alias-label-tertiary: #4f747b;
+  --dsw-alias-label-caption: #6b8f96;
+  --dsw-alias-brand-primary: #0a6f89;
+  --dsw-alias-brand-text: #0a6f89;
+  --dsw-alias-button-primary-fill: #0a6f89;
+  --dsw-alias-label-primary-foreground: #ffffff;
+  --dsw-alias-label-primary-inverted: #ffffff;
+  --dsw-alias-border-l1: rgba(10, 111, 137, 0.14);
+  --dsw-alias-border-l2: rgba(10, 111, 137, 0.24);
+  --dsw-alias-border-l3: rgba(10, 111, 137, 0.34);
+  --dsw-alias-interactive-bg-hover: rgba(10, 111, 137, 0.09);
+  --dsw-alias-button-ghost-active-fill: rgba(10, 111, 137, 0.14);
+  --dsw-alias-state-error-primary: #b5450a;
+  --dsw-specific-sidebar-fill: #e7f5f7;
+  --dsw-specific-menu: #e7f5f7;
+  --dsw-specific-login-input: #e7f5f7;
+  --dsw-specific-input-major: #f2fafb;
+  --ds-radius-1: 12px;
+  --ds-radius-2: 12px;
+  --ds-radius-4: 12px;
+  --ds-radius-6: 12px;
+  --ds-radius-8: 12px;
+  --ds-radius-10: 16px;
+  --ds-radius-11: 16px;
+  --ds-radius-12: 16px;
+  --ds-radius-14: 16px;
+  --ds-radius-16: 16px;
+  --ds-radius-18: 20px;
+  --ds-radius-20: 20px;
+  --ds-radius-22: 20px;
+  --ds-radius-24: 20px;
+  --ds-radius-28: 20px;
+  --ds-radius-40: 20px;
+  --ds-radius-100: 20px;
+  --ds-radius-4096: 20px;
+}
+
+body[data-ds-preset='fish'][data-ds-dark-theme] {
+  --dsw-alias-bg-base: #061c23;
+  --dsw-alias-bg-layer-2: #0b2a33;
+  --dsw-alias-bg-layer-3: #103842;
+  --dsw-alias-label-primary: #d7f1f5;
+  --dsw-alias-label-secondary: #a7d2da;
+  --dsw-alias-label-tertiary: #86b6bf;
+  --dsw-alias-label-caption: #6f9aa3;
+  --dsw-alias-brand-primary: #5cc8e0;
+  --dsw-alias-brand-text: #7ee0f4;
+  --dsw-alias-button-primary-fill: #0a6f89;
+  --dsw-alias-label-primary-foreground: #ffffff;
+  --dsw-alias-label-primary-inverted: #061c23;
+  --dsw-alias-border-l1: rgba(126, 224, 244, 0.14);
+  --dsw-alias-border-l2: rgba(126, 224, 244, 0.22);
+  --dsw-alias-border-l3: rgba(126, 224, 244, 0.3);
+  --dsw-alias-interactive-bg-hover: rgba(126, 224, 244, 0.1);
+  --dsw-alias-button-ghost-active-fill: rgba(92, 200, 224, 0.18);
+  --dsw-alias-state-error-primary: #ff9a5c;
+  --dsw-specific-sidebar-fill: #0b2a33;
+  --dsw-specific-menu: #103842;
+  --dsw-specific-login-input: #0b2a33;
+  --dsw-specific-input-major: #061c23;
+}
+
+body[data-ds-preset='paper'] {
+  --dsw-alias-bg-base: #faf6ee;
+  --dsw-alias-bg-layer-2: #f3ecdf;
+  --dsw-alias-bg-layer-3: #ece2d2;
+  --dsw-alias-label-primary: #2f2a24;
+  --dsw-alias-label-secondary: #5a5145;
+  --dsw-alias-label-tertiary: #7c7264;
+  --dsw-alias-label-caption: #998e7e;
+  --dsw-alias-brand-primary: #5a4632;
+  --dsw-alias-brand-text: #5a4632;
+  --dsw-alias-button-primary-fill: #5a4632;
+  --dsw-alias-label-primary-foreground: #faf6ee;
+  --dsw-alias-label-primary-inverted: #faf6ee;
+  --dsw-alias-border-l1: rgba(90, 70, 50, 0.14);
+  --dsw-alias-border-l2: rgba(90, 70, 50, 0.24);
+  --dsw-alias-border-l3: rgba(90, 70, 50, 0.32);
+  --dsw-alias-interactive-bg-hover: rgba(90, 70, 50, 0.08);
+  --dsw-alias-button-ghost-active-fill: rgba(90, 70, 50, 0.12);
+  --dsw-alias-state-error-primary: #a3311b;
+  --dsw-specific-sidebar-fill: #f3ecdf;
+  --dsw-specific-menu: #f3ecdf;
+  --dsw-specific-login-input: #f3ecdf;
+  --dsw-specific-input-major: #faf6ee;
+  --ds-radius-1: 8px;
+  --ds-radius-2: 8px;
+  --ds-radius-4: 8px;
+  --ds-radius-6: 8px;
+  --ds-radius-8: 8px;
+  --ds-radius-10: 12px;
+  --ds-radius-11: 12px;
+  --ds-radius-12: 12px;
+  --ds-radius-14: 12px;
+  --ds-radius-16: 12px;
+  --ds-radius-18: 12px;
+  --ds-radius-20: 12px;
+  --ds-radius-22: 12px;
+  --ds-radius-24: 12px;
+  --ds-radius-28: 12px;
+  --ds-radius-40: 12px;
+  --ds-radius-100: 12px;
+  --ds-radius-4096: 12px;
+  --dsw-font-markdown-h1: 700 24px/34px Georgia, 'Songti SC', 'Noto Serif SC', SimSun, serif;
+  --dsw-font-markdown-h2: 700 22px/32px Georgia, 'Songti SC', 'Noto Serif SC', SimSun, serif;
+  --dsw-font-markdown-h3: 700 20px/30px Georgia, 'Songti SC', 'Noto Serif SC', SimSun, serif;
+}
+
+body[data-ds-preset='paper'][data-ds-dark-theme] {
+  --dsw-alias-bg-base: #1b1712;
+  --dsw-alias-bg-layer-2: #241f18;
+  --dsw-alias-bg-layer-3: #2d261d;
+  --dsw-alias-label-primary: #f0e6d6;
+  --dsw-alias-label-secondary: #d3c3ab;
+  --dsw-alias-label-tertiary: #b6a58c;
+  --dsw-alias-label-caption: #9b8b75;
+  --dsw-alias-brand-primary: #d6b487;
+  --dsw-alias-brand-text: #e7c9a0;
+  --dsw-alias-button-primary-fill: #d6b487;
+  --dsw-alias-label-primary-foreground: #1b1712;
+  --dsw-alias-label-primary-inverted: #1b1712;
+  --dsw-alias-border-l1: rgba(240, 230, 214, 0.12);
+  --dsw-alias-border-l2: rgba(240, 230, 214, 0.2);
+  --dsw-alias-border-l3: rgba(240, 230, 214, 0.28);
+  --dsw-alias-interactive-bg-hover: rgba(240, 230, 214, 0.08);
+  --dsw-alias-button-ghost-active-fill: rgba(214, 180, 135, 0.16);
+  --dsw-alias-state-error-primary: #ff8f7a;
+  --dsw-specific-sidebar-fill: #241f18;
+  --dsw-specific-menu: #2d261d;
+  --dsw-specific-login-input: #241f18;
+  --dsw-specific-input-major: #1b1712;
+}

@@ -22,6 +22,7 @@ const ZOOM_FACTORS: ZoomFactor[] = [0.9, 1, 1.1, 1.25]
 export type ReadingWidth = 'comfortable' | 'wide'
 export type TtsSpeed = 0.8 | 1 | 1.2
 export type SendKey = 'enter' | 'ctrlEnter'
+export type Appearance = 'original' | 'tui' | 'fish' | 'paper'
 
 /**
  * 本机设置，存 localStorage：语言、主题、位置、朗读音色、深度思考与智能搜索开关、侧边栏收起状态。
@@ -46,6 +47,8 @@ type Settings = {
   readingWidth: ReadingWidth
   ttsSpeed: TtsSpeed
   sendKey: SendKey
+  appearance: Appearance
+  showMascot: boolean
 }
 
 const KEYS = {
@@ -62,6 +65,8 @@ const KEYS = {
   readingWidth: 'chat-demo:reading-width',
   ttsSpeed: 'chat-demo:tts-speed',
   sendKey: 'chat-demo:send-key',
+  appearance: 'chat-demo:appearance',
+  showMascot: 'chat-demo:show-mascot',
 } as const
 
 /** Electron preload 注入的桌面桥接；纯网页环境返回 undefined */
@@ -177,6 +182,11 @@ export const useSettings = create<Settings>(() => ({
   readingWidth: read(KEYS.readingWidth) === 'wide' ? 'wide' : 'comfortable',
   ttsSpeed: read(KEYS.ttsSpeed) === '0.8' ? 0.8 : read(KEYS.ttsSpeed) === '1.2' ? 1.2 : 1,
   sendKey: read(KEYS.sendKey) === 'ctrlEnter' ? 'ctrlEnter' : 'enter',
+  appearance: (() => {
+    const value = read(KEYS.appearance)
+    return value === 'tui' || value === 'fish' || value === 'paper' ? value : 'original'
+  })(),
+  showMascot: read(KEYS.showMascot) !== 'false',
 }))
 
 export const setLocale = (locale: Locale) => {
@@ -350,6 +360,16 @@ export const setTtsSpeed = (ttsSpeed: TtsSpeed) => {
 export const setSendKey = (sendKey: SendKey) => {
   write(KEYS.sendKey, sendKey)
   useSettings.setState({ sendKey })
+}
+
+export const setAppearance = (appearance: Appearance) => {
+  write(KEYS.appearance, appearance)
+  useSettings.setState({ appearance })
+}
+
+export const setShowMascot = (showMascot: boolean) => {
+  write(KEYS.showMascot, String(showMascot))
+  useSettings.setState({ showMascot })
 }
 
 export const setNotifyOnComplete = (notifyOnComplete: boolean) => {

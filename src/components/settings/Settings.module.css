@@ -33,7 +33,7 @@
   margin: 0 4px;
   padding: 9px 10px 9px 8px;
   border: none;
-  border-radius: 12px;
+  border-radius: var(--ds-radius-12);
   background-color: transparent;
   color: var(--dsw-alias-label-primary);
   font: inherit;
@@ -178,7 +178,7 @@
   height: 76px;
   padding: 14px 18px;
   border: 1px solid var(--dsw-alias-border-l2);
-  border-radius: 12px;
+  border-radius: var(--ds-radius-12);
   background-color: transparent;
   color: var(--dsw-alias-label-primary);
   font: inherit;
@@ -240,7 +240,7 @@
 .apiKeySaved {
   justify-content: space-between;
   padding: 0 10px 0 16px;
-  border-radius: 28px;
+  border-radius: var(--ds-radius-28);
   background-color: var(--dsw-specific-login-input);
 }
 
@@ -255,7 +255,7 @@
 .apiKeyInput {
   gap: 12px;
   padding: 0 14px;
-  border-radius: 22px;
+  border-radius: var(--ds-radius-22);
   border: 1px solid var(--dsw-alias-border-l2);
   transition: border-color var(--ds-transition-duration) var(--ds-ease-in-out);
 
@@ -311,7 +311,7 @@
     max-width: none;
     height: calc(100% - 64px);
     max-height: 800px;
-    border-radius: 24px 24px 0 0;
+    border-radius: var(--ds-radius-24) var(--ds-radius-24) 0 0;
   }
 
   .dialogMain {
@@ -386,7 +386,7 @@
     height: 52px;
     padding: 0 12px 0 16px;
     border: none;
-    border-radius: 40px;
+    border-radius: var(--ds-radius-40);
     background-color: var(--dsw-specific-login-input);
     font-size: 16px;
   }
@@ -408,7 +408,7 @@
   height: 52px;
   margin: 16px 8px 0;
   border: none;
-  border-radius: 100px;
+  border-radius: var(--ds-radius-100);
   background-color: var(--dsw-alias-button-primary-fill);
   color: var(--dsw-static-neutral-bluish-00);
   font: inherit;
@@ -495,7 +495,7 @@
   height: 22px;
   padding: 0;
   border: 1px solid rgba(0, 0, 0, 0.45);
-  border-radius: 11px;
+  border-radius: var(--ds-radius-11);
   background-color: rgba(0, 0, 0, 0.28);
   cursor: pointer;
   transition: background-color 0.2s, border-color 0.2s;
@@ -541,7 +541,7 @@
   left: 2px;
   width: 16px;
   height: 16px;
-  border-radius: 50%;
+  border-radius:50%;
   border: 1px solid rgba(0, 0, 0, 0.18);
   background-color: #fff;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
@@ -584,7 +584,7 @@
 .aboutWarning {
   margin-top: 12px;
   padding: 8px 10px;
-  border-radius: 8px;
+  border-radius: var(--ds-radius-8);
   background-color: var(--dsw-alias-interactive-bg-hover-danger);
   color: var(--dsw-alias-state-error-primary);
   font-size: 12px;
@@ -646,7 +646,7 @@
 .presetBadge {
   flex-shrink: 0;
   padding: 0 6px;
-  border-radius: 6px;
+  border-radius: var(--ds-radius-6);
   background-color: var(--dsw-alias-button-ghost-active-fill);
   color: var(--dsw-alias-brand-text);
   font-size: 11px;
@@ -701,7 +701,7 @@
   width: 100%;
   padding: 8px 10px;
   border: 1px solid var(--dsw-alias-border-l2);
-  border-radius: 10px;
+  border-radius: var(--ds-radius-10);
   background-color: var(--dsw-specific-input-major);
   color: var(--dsw-alias-label-primary);
   font: inherit;
@@ -714,4 +714,15 @@
 .presetInput:focus,
 .presetTextarea:focus {
   border-color: var(--dsw-alias-brand-primary);
+}
+
+.presetEditor {
+  max-height: calc(100dvh - 32px);
+}
+
+.presetEditorMain {
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-color: var(--scroll-color) transparent;
 }

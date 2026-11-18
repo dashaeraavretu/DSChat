@@ -26,14 +26,17 @@ import {
   setCloseToTray,
   setLocale,
   setLocation,
+  setAppearance,
   setNotifyOnComplete,
   setReadingWidth,
   setSendKey,
+  setShowMascot,
   setThemePreference,
   setTtsSpeed,
   setTtsVoice,
   setZoomPreference,
   useSettings,
+  type Appearance,
   type ReadingWidth,
   type SendKey,
   type ThemePreference,
@@ -142,6 +145,8 @@ const SettingsContent = () => {
               <CloseToTraySetting />
               <NotificationSetting />
               <ZoomSetting />
+              <AppearanceSetting />
+              <MascotSetting />
               <ReadingWidthSetting />
               <TtsSpeedSetting />
               <SendKeySetting />
@@ -619,6 +624,56 @@ const ZoomSetting = () => {
   )
 }
 
+const AppearanceSetting = () => {
+  const t = useTranslate()
+  const appearance = useSettings((state) => state.appearance)
+  return (
+    <SettingCell
+      label={t('settingsAppearance')}
+      status={null}
+      action={
+        <Select
+          ariaLabel={t('settingsAppearance')}
+          value={appearance}
+          options={[
+            { value: 'original', label: t('appearanceOriginal') },
+            { value: 'tui', label: t('appearanceTui') },
+            { value: 'fish', label: t('appearanceFish') },
+            { value: 'paper', label: t('appearancePaper') },
+          ]}
+          onChange={(value) => setAppearance(value as Appearance)}
+        />
+      }
+    />
+  )
+}
+
+const MascotSetting = () => {
+  const t = useTranslate()
+  const showMascot = useSettings((state) => state.showMascot)
+  const appearance = useSettings((state) => state.appearance)
+  return (
+    <SettingCell
+      label={t('settingsShowMascot')}
+      description={t('settingsShowMascotDescription')}
+      status={null}
+      action={
+        <button
+          type="button"
+          role="switch"
+          aria-checked={showMascot}
+          aria-label={t('settingsShowMascot')}
+          className={clsx(styles.switch, showMascot && styles.switchOn)}
+          disabled={appearance !== 'fish'}
+          onClick={() => setShowMascot(!showMascot)}
+        >
+          <span className={styles.switchThumb} />
+        </button>
+      }
+    />
+  )
+}
+
 const ReadingWidthSetting = () => {
   const t = useTranslate()
   const readingWidth = useSettings((state) => state.readingWidth)
@@ -770,6 +825,10 @@ const AboutDialog = ({ onClose }: { onClose: () => void }) => {
         </div>
       ) : null}
       <div className={styles.aboutDescription}>{t('diagnosticsDescription')}</div>
+      <div className={styles.aboutDescription}>
+        {t('thirdPartyLicenses')}: React, Zustand, KaTeX, Mermaid, Prism, idb, fflate ·
+        THIRD_PARTY_NOTICES.md
+      </div>
     </Modal>
   )
 }

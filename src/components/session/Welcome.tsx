@@ -3,6 +3,8 @@ import { useTranslate } from '../../i18n/index.js'
 import { ChatInput } from '../chatInput/ChatInput.js'
 import { useChatStore } from '../../services/chat/store.js'
 import { usePresets } from '../../services/presets.js'
+import { useSettings } from '../../services/settings.js'
+import { FatFishMascot } from './FatFishMascot.js'
 import { MobileHeader } from './MobileHeader.js'
 import styles from './Welcome.module.css'
 
@@ -11,6 +13,8 @@ export const Welcome = () => {
   const t = useTranslate()
   const isMobile = useIsMobile()
   const ephemeral = useChatStore((state) => state.ephemeralNewChat)
+  const appearance = useSettings((state) => state.appearance)
+  const showMascot = useSettings((state) => state.showMascot)
   const preset = usePresets((state) =>
     state.presets.find((item) => item.id === state.defaultId)
   )
@@ -18,6 +22,7 @@ export const Welcome = () => {
     <div className={styles.container}>
       {isMobile ? <MobileHeader /> : null}
       <div className={styles.welcome}>
+        {appearance === 'fish' && showMascot ? <FatFishMascot /> : null}
         {ephemeral ? <div className={styles.ephemeralBadge}>{t('ephemeralBadge')}</div> : null}
         <div className={styles.greeting}>{t('welcomeMessageChat250808')}</div>
         {preset?.greeting ? (

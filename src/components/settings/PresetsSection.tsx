@@ -8,6 +8,7 @@ import {
 } from '../../services/characterCard.js'
 import {
   createPreset,
+  deletePreset,
   setDefaultPreset,
   updatePreset,
   usePresets,
@@ -37,6 +38,7 @@ export const PresetsSection = () => {
   const presets = usePresets((state) => state.presets)
   const defaultId = usePresets((state) => state.defaultId)
   const [draft, setDraft] = useState<Draft | null>(null)
+  const [deleting, setDeleting] = useState<Preset | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
   const openNew = () => setDraft({ name: '', system: '', greeting: '' })
@@ -147,13 +149,46 @@ export const PresetsSection = () => {
               <Button variant="outlined" size="s" onClick={() => openEdit(preset)}>
                 {t('presetEdit')}
               </Button>
+              <Button
+                variant="dangerOutlined"
+                size="s"
+                onClick={() => setDeleting(preset)}
+              >
+                {t('presetDelete')}
+              </Button>
             </div>
           </div>
         ))}
       </div>
+      {deleting ? (
+        <Modal
+          title={t('presetDeleteTitle')}
+          onClose={() => setDeleting(null)}
+          footer={
+            <div className={styles.deleteActions}>
+              <Button variant="outlined" onClick={() => setDeleting(null)}>
+                {t('cancel')}
+              </Button>
+              <Button
+                variant="danger"
+                onClick={() => {
+                  deletePreset(deleting.id)
+                  setDeleting(null)
+                }}
+              >
+                {t('presetDelete')}
+              </Button>
+            </div>
+          }
+        >
+          {t('presetDeleteDescription', { name: deleting.name })}
+        </Modal>
+      ) : null}
       {draft ? (
         <Modal
           title={draft.id ? t('presetEdit') : t('presetNew')}
+          className={styles.presetEditor}
+          mainClassName={styles.presetEditorMain}
           onClose={() => setDraft(null)}
           footer={
             <div className={styles.deleteActions}>

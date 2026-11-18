@@ -21,7 +21,7 @@
   flex-shrink: 0;
   width: 2px;
   height: 5px;
-  border-radius: 1px;
+  border-radius: var(--ds-radius-1);
   background-color: var(--dsw-alias-button-info-hover, #679efe);
   transform-origin: center;
   will-change: transform;
