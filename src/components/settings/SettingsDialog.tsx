@@ -847,6 +847,8 @@ const SendKeySetting = () => {
 const AboutDialog = ({ onClose }: { onClose: () => void }) => {
   const t = useTranslate()
   const [exporting, setExporting] = useState(false)
+  const [checkingUpdate, setCheckingUpdate] = useState(false)
+  const [updateResult, setUpdateResult] = useState<DesktopUpdateResult | null>(null)
   const bridge = window.desktop
   const featureLabels = [
     FEATURES.files ? t('aboutFeatureFiles') : null,
@@ -881,6 +883,46 @@ const AboutDialog = ({ onClose }: { onClose: () => void }) => {
       setExporting(false)
     }
   }
+
+  const checkUpdate = async () => {
+    if (!bridge?.checkForUpdate) {
+      return
+    }
+    setCheckingUpdate(true)
+    try {
+      setUpdateResult(await bridge.checkForUpdate())
+    } catch {
+      setUpdateResult({ ok: false, error: { code: 'network', message: '' } })
+    } finally {
+      setCheckingUpdate(false)
+    }
+  }
+
+  const openUpdatePage = async () => {
+    if (!bridge?.openUpdatePage) {
+      return
+    }
+    await bridge.openUpdatePage()
+  }
+
+  const updateMessage = (() => {
+    if (!updateResult) {
+      return ''
+    }
+    if (!updateResult.ok) {
+      if (updateResult.error.code === 'not-configured') {
+        return t('aboutUpdateNotConfigured')
+      }
+      if (updateResult.error.code === 'rate-limit') {
+        return t('aboutUpdateRateLimited')
+      }
+      return t('aboutUpdateFailed')
+    }
+    if (updateResult.hasUpdate) {
+      return t('aboutUpdateAvailable', { version: updateResult.latestVersion ?? '' })
+    }
+    return t('aboutUpToDate', { version: updateResult.currentVersion })
+  })()
 
   return (
     <Modal
@@ -921,6 +963,33 @@ const AboutDialog = ({ onClose }: { onClose: () => void }) => {
             {featureLabels.length > 0 ? featureLabels.join(' / ') : t('aboutNone')}
           </span>
         </div>
+        {bridge?.checkForUpdate ? (
+          <div className={styles.aboutRow}>
+            <span className={styles.aboutLabel}>{t('aboutUpdates')}</span>
+            <span className={styles.aboutValue}>
+              <button
+                type="button"
+                className={styles.aboutLink}
+                disabled={checkingUpdate}
+                onClick={() => void checkUpdate()}
+              >
+                {t(checkingUpdate ? 'aboutCheckingUpdate' : 'aboutCheckUpdate')}
+              </button>
+              {updateMessage ? (
+                <span className={styles.aboutUpdateMessage}>{updateMessage}</span>
+              ) : null}
+              {updateResult?.ok && updateResult.hasUpdate ? (
+                <button
+                  type="button"
+                  className={styles.aboutLink}
+                  onClick={() => void openUpdatePage()}
+                >
+                  {t('aboutOpenDownload')}
+                </button>
+              ) : null}
+            </span>
+          </div>
+        ) : null}
       </div>
       {disabledLabels.length > 0 ? (
         <div className={styles.aboutWarning}>

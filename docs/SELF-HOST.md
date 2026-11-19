@@ -156,9 +156,10 @@ set DSCHAT_API_ORIGIN=https://api.example.com && pnpm build
 3. **非官方身份**：不要使用 DeepSeek 的名称、Logo 或域名暗示官方背书。应用名、图标和发布者信息应明确为独立项目。
 4. **不内置密钥**：构建产物、安装包、示例文件和 CI 日志中都不得出现真实 API Key。发布前可检查 `secrets.json`、`.env`、`dist/` 和打包目录。
 5. **用户数据**：安装包不应包含开发机的 `userData`。升级安装时保留用户已有数据；卸载是否删除数据应由安装器策略明确说明。
-6. **签名与 SmartScreen**：未签名的 Windows 安装包会触发 SmartScreen 警告。正式分发建议使用代码签名证书；内部测试可提供 SHA-256 校验值。签名是可选项，不影响功能。
-7. **版本与更新**：版本号取自 `package.json`，会暴露在 preload 的 `desktop.version` 中。若提供自动更新，需自行配置更新源并校验签名。
+6. **签名与 SmartScreen**：当前发布不购买代码签名证书，Windows 安装包未签名，会触发 SmartScreen 警告。发布说明必须明确披露，并提供 SHA-256 校验值（`release/SHA256SUMS.txt`）。签名是可选项，不影响功能。
+7. **版本与更新**：版本号取自 `package.json`，会暴露在 preload 的 `desktop.version` 中。当前只做「检查更新 → 打开下载页」，不自动下载或安装。更新源是公开的 GitHub Releases：构建时设置 `DSCHAT_GITHUB_REPO=owner/repo`（或在 `package.json.repository` 中配置），脚本写入 `electron/release-config.json`；未配置时关于页显示“未配置更新源”。私有仓库不支持，因为公开 Updates API 不需要 Token。
 8. **可构建性**：MIT 不要求公开修改源码，但建议发布构建说明与对应源码标签，便于用户自行构建和审计。
+9. **CI 发布**：`.github/workflows/release.yml` 在推送 `vX.Y.Z` tag 时于 Windows runner 上安装依赖、跑 type/lint/test/test:proxy、构建官方安装包、生成 `SHA256SUMS.txt` 并上传到 GitHub Releases。只发布默认官方包，千机测试包不进入公开 Release。
 
 ## 8. 常见问题
 

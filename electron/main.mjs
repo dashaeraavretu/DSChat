@@ -23,6 +23,13 @@ import {
   validateProvider as validateProviderConfig,
 } from './provider-config.mjs'
 import {
+  buildLatestReleaseUrl,
+  evaluateUpdate,
+  isAllowedReleaseUrl,
+  parseLatestRelease,
+  readReleaseConfig,
+} from './update-check.mjs'
+import {
   existsSync,
   mkdirSync,
   readFileSync,
@@ -45,10 +52,11 @@ const DEV = process.env.DSCHAT_DEV === '1'
 const SMOKE = process.argv.includes('--smoke')
 const SMOKE_BLOB = process.argv.includes('--smoke-blob')
 const SMOKE_PROXY = process.argv.includes('--smoke-proxy')
+const SMOKE_UPDATE = process.argv.includes('--smoke-update')
 
-// 代理冒烟测试固定使用临时 userData，绝不读写真实 profile
-if (SMOKE_PROXY) {
-  app.setPath('userData', path.join(os.tmpdir(), `dschat-proxy-smoke-${process.pid}`))
+// 冒烟测试固定使用临时 userData，绝不读写真实 profile
+if (SMOKE_PROXY || SMOKE_UPDATE) {
+  app.setPath('userData', path.join(os.tmpdir(), `dschat-smoke-${process.pid}`))
 }
 
 const FILES_BETA = 'files-api-2025-04-14'
@@ -65,6 +73,12 @@ const BUILD_PROVIDER = readBuildProvider(
   readFileSync
 )
 const ALLOWED_PROVIDER_ROOTS = providerRoots(BUILD_PROVIDER)
+/** 更新源配置（GitHub owner/repo）；构建时写入，未配置时更新检查返回 not-configured */
+const RELEASE_CONFIG = readReleaseConfig(
+  path.join(__dirname, 'release-config.json'),
+  readFileSync
+)
+const GITHUB_REPO = RELEASE_CONFIG.githubRepo
 
 /** 当前代理目标；只由主进程保存，渲染层无法在单次请求里指定 URL */
 let apiProvider = resolveDefaultProvider({ build: BUILD_PROVIDER })
@@ -710,6 +724,73 @@ async function beginProviderStream(event, { id, kind, url, init, requireSse }) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// 更新检查：只查询 GitHub Releases 最新版本并打开下载页，不自动下载/安装。
+// ---------------------------------------------------------------------------
+
+const UPDATE_CACHE_MS = 5 * 60 * 1000
+let updateCache = { at: 0, result: null }
+
+const updateFailure = (code, message, status) => ({
+  ok: false,
+  error: {
+    code,
+    message: sanitizeErrorText(message),
+    ...(typeof status === 'number' ? { status } : {}),
+  },
+})
+
+async function checkLatestRelease({
+  repo = GITHUB_REPO,
+  currentVersion = app.getVersion(),
+  apiOrigin = 'https://api.github.com',
+  cache = true,
+} = {}) {
+  if (!repo) return updateFailure('not-configured', '更新源未配置')
+  if (cache && updateCache.result && Date.now() - updateCache.at < UPDATE_CACHE_MS) {
+    return updateCache.result
+  }
+  const url = buildLatestReleaseUrl(repo, apiOrigin)
+  if (!url) return updateFailure('not-configured', '更新源未配置')
+  try {
+    const response = await net.fetch(url, {
+      headers: {
+        Accept: 'application/vnd.github+json',
+        'X-GitHub-Api-Version': '2022-11-28',
+        'User-Agent': `${APP_NAME}/${app.getVersion()}`,
+      },
+      signal: AbortSignal.timeout(10000),
+    })
+    if (!response.ok) {
+      if (response.status === 404) {
+        return updateFailure('repo-not-found', '找不到更新仓库', response.status)
+      }
+      if (response.status === 403 || response.status === 429) {
+        return updateFailure('rate-limit', '检查更新过于频繁，请稍后再试', response.status)
+      }
+      return updateFailure('http', `更新服务返回 HTTP ${response.status}`, response.status)
+    }
+    const payload = await response.json().catch(() => null)
+    const release = parseLatestRelease(payload, repo)
+    if (!release) return updateFailure('invalid-response', '更新服务响应无效')
+    const result = {
+      ok: true,
+      ...evaluateUpdate(currentVersion, release),
+      repo,
+    }
+    if (cache) updateCache = { at: Date.now(), result }
+    return result
+  } catch (error) {
+    if (error?.name === 'TimeoutError' || error?.name === 'AbortError') {
+      return updateFailure('network', '检查更新超时')
+    }
+    return updateFailure(
+      'network',
+      error instanceof Error ? error.message : String(error)
+    )
+  }
+}
+
 function registerIpc() {
   ipcMain.on('settings:get-key-status', (event) => {
     event.returnValue = keyStorageStatus()
@@ -717,6 +798,23 @@ function registerIpc() {
 
   ipcMain.on('app:get-version', (event) => {
     event.returnValue = app.getVersion()
+  })
+
+  ipcMain.handle('update:check', (event) => {
+    if (!isTrustedSender(event)) return updateFailure('protocol', '不可信来源')
+    return checkLatestRelease()
+  })
+
+  /** 只打开本次检查缓存的、属于配置仓库的 Release 页面 */
+  ipcMain.handle('update:open-page', (event) => {
+    if (!isTrustedSender(event)) return false
+    const result = updateCache.result
+    if (!result?.ok || !result.url) return false
+    if (!isAllowedReleaseUrl(GITHUB_REPO, result.url)) return false
+    void shell.openExternal(result.url).catch((error) => {
+      logger?.warn(`打开更新页面失败：${error instanceof Error ? error.message : String(error)}`)
+    })
+    return true
   })
 
   ipcMain.on('settings:get-key-storage', (event) => {
@@ -1501,12 +1599,15 @@ if (!gotSingleInstanceLock) {
     logger = createLogger(path.join(app.getPath('userData'), 'logs'))
     logger.info(`应用启动 v${app.getVersion()} electron ${process.versions.electron}`)
 
-    if (SMOKE_PROXY) {
+    if (SMOKE_PROXY || SMOKE_UPDATE) {
       try {
         await session.defaultSession.setProxy({ mode: 'direct' })
       } catch (error) {
-        console.warn('[smoke-proxy] 设置直连失败：', error)
+        console.warn('[smoke] 设置直连失败：', error)
       }
+    }
+
+    if (SMOKE_PROXY) {
       // 仅源码测试使用；proxy-smoke.mjs 不进入安装包
       const { runProxySmoke } = await import('./proxy-smoke.mjs')
       const code = await runProxySmoke({
@@ -1531,6 +1632,14 @@ if (!gotSingleInstanceLock) {
           return true
         },
       })
+      app.exit(code)
+      return
+    }
+
+    if (SMOKE_UPDATE) {
+      // 仅源码测试使用；update-smoke.mjs 不进入安装包
+      const { runUpdateSmoke } = await import('./update-smoke.mjs')
+      const code = await runUpdateSmoke({ checkLatestRelease })
       app.exit(code)
       return
     }

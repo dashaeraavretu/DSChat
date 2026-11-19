@@ -60,6 +60,12 @@ DSChat v1 aims to reproduce the official demo's feature set on the desktop:
 - Markdown, syntax highlighting, KaTeX math, and Mermaid diagrams.
 - Simplified Chinese and English, light and dark themes (including follow-system), mobile layouts, location settings, and chat history import and export.
 
+Unreleased (0.4.0):
+
+- About dialog: check the latest GitHub Release and open its download page; no automatic download or installation.
+- GitHub Actions release workflow for tagged Windows builds, with SHA256 checksums and release assets.
+- The Windows installer is unsigned; SmartScreen warnings are expected.
+
 Added in 0.3.3:
 
 - Strict Content-Security-Policy on `dsc://app`; no inline scripts and no direct renderer connections to the API.
@@ -134,6 +140,12 @@ The build writes the resolved provider (origin, endpoint paths, model, feature f
 
 The endpoint must implement the Anthropic-compatible Messages / Files API and the extensions used by the demo (search, link reading, titles, `latest_reminder`, ASR/TTS). See [docs/SELF-HOST.md](docs/SELF-HOST.md) for details and security considerations.
 
+## Updates and releases
+
+DSChat does **not** auto-update. The About dialog has a **Check for updates** action that queries the public GitHub Releases API for the repository baked in at build time (`DSCHAT_GITHUB_REPO` or `package.json.repository`) and, when a newer version exists, opens its download page in the system browser. The request is sent by the main process; it contains no API key or chat data. Private repositories are not supported by the unauthenticated update checker.
+
+Tagged builds (`vX.Y.Z`) are produced by `.github/workflows/release.yml` and published to GitHub Releases with `SHA256SUMS.txt`. The installer is not code-signed, so Windows may show a SmartScreen warning; verify the SHA256 checksum before running.
+
 ## Development
 
 | Command           | Description                                   |
@@ -150,6 +162,7 @@ The endpoint must implement the Anthropic-compatible Messages / Files API and th
 | `pnpm lint`       | Lint with oxlint                              |
 | `pnpm test`       | Run all headless regression tests             |
 | `pnpm test:proxy` | Exercise the main-process API proxy against a local mock |
+| `pnpm test:update` | Exercise the update checker against a mock Releases API |
 | `pnpm format`     | Format with oxfmt                             |
 | `node tests/smoke.mjs` | Zero-dependency post-build smoke test    |
 

@@ -13,3 +13,4 @@ tmp/
 *.tsbuildinfo
 release-test/
 electron/provider-config.json
+electron/release-config.json

@@ -298,5 +298,32 @@ contextBridge.exposeInMainWorld('desktop', {
       return false
     }
   },
+  /** 检查 GitHub Releases 最新版本；不自动下载或安装 */
+  async checkForUpdate() {
+    try {
+      const result = await ipcRenderer.invoke('update:check')
+      if (!result || typeof result !== 'object') {
+        return { ok: false, error: { code: 'protocol', message: '更新检查响应无效' } }
+      }
+      return result
+    } catch (error) {
+      return {
+        ok: false,
+        error: {
+          code: 'network',
+          message: error instanceof Error ? error.message : String(error),
+        },
+      }
+    }
+  },
+  /** 打开本次更新检查得到的 Release 下载页 */
+  async openUpdatePage() {
+    try {
+      return (await ipcRenderer.invoke('update:open-page')) === true
+    } catch (error) {
+      console.error('[preload] 打开更新页面失败：', error)
+      return false
+    }
+  },
   version,
 })

@@ -44,6 +44,34 @@ type DesktopApiResult<T = null> =
   | { ok: true; value: T }
   | { ok: false; error: DesktopApiError }
 
+/** 更新检查错误码：未配置仓库、限流、仓库不存在、网络或响应无效 */
+interface DesktopUpdateError {
+  code:
+    | 'not-configured'
+    | 'rate-limit'
+    | 'repo-not-found'
+    | 'http'
+    | 'network'
+    | 'invalid-response'
+    | 'protocol'
+  message: string
+  status?: number
+}
+
+type DesktopUpdateResult =
+  | {
+      ok: true
+      currentVersion: string
+      hasUpdate: boolean
+      latestVersion?: string
+      url?: string
+      name?: string
+      notes?: string
+      publishedAt?: string
+      repo?: string
+    }
+  | { ok: false; error: DesktopUpdateError }
+
 interface DesktopStreamEvent {
   id: string
   kind: 'message' | 'tts'
@@ -115,6 +143,10 @@ interface DesktopBridge {
     model: string
     features: { files: boolean; speech: boolean; webTools: boolean }
   }): Promise<boolean>
+  /** 检查 GitHub Releases 最新版本；不自动下载或安装 */
+  checkForUpdate(): Promise<DesktopUpdateResult>
+  /** 打开本次检查得到的 Release 下载页 */
+  openUpdatePage(): Promise<boolean>
   version: string
 }
 

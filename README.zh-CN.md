@@ -61,6 +61,12 @@ DSChat v1 在桌面端复刻官方 demo 的功能：
 - Markdown、代码高亮、KaTeX 公式与 Mermaid 图表。
 - 简体中文与英文、浅色与深色主题（含跟随系统）、移动端布局、位置设置、历史导入导出。
 
+未发布（0.4.0）：
+
+- 关于页新增「检查更新」：查询 GitHub Releases 最新版本，有更新时打开下载页；不自动下载或安装。
+- GitHub Actions 在推送 `vX.Y.Z` tag 时构建 Windows 安装包，生成 SHA256 校验值并发布到 GitHub Releases。
+- Windows 安装包未签名，可能出现 SmartScreen 警告。
+
 0.3.3 新增：
 
 - `dsc://app` 严格 CSP：禁止内联脚本，渲染层不能直连 API。
@@ -133,6 +139,12 @@ $env:DSCHAT_API_ORIGIN = "https://api.example.com"; pnpm build
 
 目标端点需实现 Anthropic 兼容的 Messages / Files API，以及 demo 使用的扩展能力（搜索、链接阅读、标题、`latest_reminder`、ASR/TTS）。构建会把解析后的 provider（origin、端点路径、模型、功能开关）写入 `electron/provider-config.json`；主进程把它同时用作默认 provider 和代理白名单，因此自建安装包在用户机器上不依赖运行时环境变量。桌面端请求全部由主进程代理发出，不需要目标服务配置 CORS。细节与安全注意事项见 [docs/SELF-HOST.md](docs/SELF-HOST.md)。
 
+## 更新与发布
+
+DSChat **不自动更新**。关于页提供「检查更新」：主进程查询构建时配置的 GitHub 仓库（`DSCHAT_GITHUB_REPO` 或 `package.json.repository`）的公开 Releases API，有更新时在系统浏览器打开下载页。请求不包含 API Key 或聊天内容。未配置仓库、私有仓库或触发 GitHub 限流时会显示可读提示。
+
+推送 `vX.Y.Z` tag 后，`.github/workflows/release.yml` 会构建官方 Windows 安装包、生成 `SHA256SUMS.txt` 并发布到 GitHub Releases。安装包未做代码签名，Windows 可能显示 SmartScreen 警告；运行前请核对 SHA256。
+
 ## 开发
 
 | 命令                    | 说明                                   |
@@ -150,6 +162,7 @@ $env:DSCHAT_API_ORIGIN = "https://api.example.com"; pnpm build
 | `pnpm lint`             | oxlint 检查                            |
 | `pnpm test`             | 运行全部无头回归测试                   |
 | `pnpm test:proxy`       | 对本机 mock 上游验证主进程 API 代理     |
+| `pnpm test:update`      | 对本机 mock Releases API 验证更新检查   |
 | `pnpm format`           | oxfmt 格式化                           |
 | `node tests/smoke.mjs`  | 零依赖的构建后冒烟测试                 |
 

@@ -183,6 +183,15 @@ export const en = {
   aboutFeatureSpeech: 'Speech',
   aboutFeatureWebTools: 'Web tools',
   aboutTestBuildWarning: 'Test build: {features} unavailable.',
+  aboutUpdates: 'Updates',
+  aboutCheckUpdate: 'Check for updates',
+  aboutCheckingUpdate: 'Checking...',
+  aboutUpToDate: 'You are up to date ({version})',
+  aboutUpdateAvailable: 'Version {version} is available',
+  aboutOpenDownload: 'Open download page',
+  aboutUpdateNotConfigured: 'Update source is not configured',
+  aboutUpdateRateLimited: 'Too many checks; try again later',
+  aboutUpdateFailed: 'Failed to check for updates; try again later',
   thirdPartyLicenses: 'Third-party licenses',
   diagnosticsExport: 'Export diagnostics',
   diagnosticsExporting: 'Exporting...',
@@ -205,9 +214,7 @@ export const en = {
   apiKeyDesktopStorageHint:
     'Stored only on this device and encrypted by the operating system. It is never uploaded to a server.',
   apiKeyDesktopPlaintextHint:
-    'System encryption is unavailable. The API Key is stored unencrypted on this device (degraded).',
-  apiKeyDesktopFallbackHint:
-    'System encryption failed. The API Key is stored unencrypted in browser local storage (degraded).',
+    'System encryption is unavailable. The API Key stays in memory for this run only and must be re-entered after restart (degraded).',
   apiKeyWebStorageHint: "The API Key is saved in your browser's local storage.",
   apiKeyPlaceholder: 'Enter API Key',
   apiKeyVerifying: 'Verifying...',
