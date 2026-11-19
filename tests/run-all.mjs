@@ -14,6 +14,7 @@ const tests = [
   'provider-config.test.mjs',
   'update-check.test.mjs',
   'web-deploy.test.mjs',
+  'appearance.test.mjs',
   'security-csp.test.mjs',
   'security-key.test.mjs',
   'presets.test.mjs',

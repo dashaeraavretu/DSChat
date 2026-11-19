@@ -106,6 +106,12 @@ export const zh = {
   appearanceTui: 'TUI',
   appearanceFish: '胖鱼',
   appearancePaper: '纸张',
+  appearanceInk: '水墨',
+  appearanceGeek: '极客',
+  settingsAppearanceMotion: '动态背景',
+  settingsAppearanceMotionDescription:
+    '水墨/极客外观使用 WebGL 动画背景；系统开启“减少动态效果”时会自动静态显示。',
+  settingsAppearanceMotionInactive: '仅水墨与极客外观使用动态背景。',
   settingsShowMascot: '显示吉祥物',
   settingsShowMascotDescription: '仅在“胖鱼”外观下显示原创胖鱼。',
   settingsInputCount: '显示字数',
