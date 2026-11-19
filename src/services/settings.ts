@@ -22,7 +22,7 @@ const ZOOM_FACTORS: ZoomFactor[] = [0.9, 1, 1.1, 1.25]
 export type ReadingWidth = 'comfortable' | 'wide'
 export type TtsSpeed = 0.8 | 1 | 1.2
 export type SendKey = 'enter' | 'ctrlEnter'
-export type Appearance = 'original' | 'tui' | 'fish' | 'paper'
+export type Appearance = 'original' | 'tui' | 'fish' | 'paper' | 'ink' | 'geek'
 export type ProxyMode = 'system' | 'http' | 'socks5'
 
 /**
@@ -58,6 +58,8 @@ type Settings = {
   ttsSpeed: TtsSpeed
   sendKey: SendKey
   appearance: Appearance
+  /** 水墨/极客外观是否播放 WebGL 动态背景 */
+  appearanceMotion: boolean
   showMascot: boolean
   showInputCount: boolean
   notifySound: boolean
@@ -82,6 +84,7 @@ const KEYS = {
   ttsSpeed: 'chat-demo:tts-speed',
   sendKey: 'chat-demo:send-key',
   appearance: 'chat-demo:appearance',
+  appearanceMotion: 'chat-demo:appearance-motion',
   showMascot: 'chat-demo:show-mascot',
   showInputCount: 'chat-demo:show-input-count',
   notifySound: 'chat-demo:notify-sound',
@@ -226,8 +229,15 @@ export const useSettings = create<Settings>(() => ({
   sendKey: read(KEYS.sendKey) === 'ctrlEnter' ? 'ctrlEnter' : 'enter',
   appearance: (() => {
     const value = read(KEYS.appearance)
-    return value === 'tui' || value === 'fish' || value === 'paper' ? value : 'original'
+    return value === 'tui' ||
+      value === 'fish' ||
+      value === 'paper' ||
+      value === 'ink' ||
+      value === 'geek'
+      ? value
+      : 'original'
   })(),
+  appearanceMotion: read(KEYS.appearanceMotion) !== 'false',
   showMascot: read(KEYS.showMascot) !== 'false',
   showInputCount: read(KEYS.showInputCount) !== 'false',
   notifySound: read(KEYS.notifySound) !== 'false',
@@ -474,6 +484,11 @@ export const setSendKey = (sendKey: SendKey) => {
 export const setAppearance = (appearance: Appearance) => {
   write(KEYS.appearance, appearance)
   useSettings.setState({ appearance })
+}
+
+export const setAppearanceMotion = (appearanceMotion: boolean) => {
+  write(KEYS.appearanceMotion, String(appearanceMotion))
+  useSettings.setState({ appearanceMotion })
 }
 
 export const setShowMascot = (showMascot: boolean) => {

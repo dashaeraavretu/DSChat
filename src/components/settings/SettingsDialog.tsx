@@ -27,6 +27,7 @@ import {
   setLocale,
   setLocation,
   setAppearance,
+  setAppearanceMotion,
   setNotifyOnComplete,
   setNotifySound,
   setReadingWidth,
@@ -147,6 +148,7 @@ const SettingsContent = () => {
               <NotificationSoundSetting />
               <ZoomSetting />
               <AppearanceSetting />
+              <AppearanceMotionSetting />
               <MascotSetting />
               <InputCountSetting />
               <ReadingWidthSetting />
@@ -738,9 +740,40 @@ const AppearanceSetting = () => {
             { value: 'tui', label: t('appearanceTui') },
             { value: 'fish', label: t('appearanceFish') },
             { value: 'paper', label: t('appearancePaper') },
+            { value: 'ink', label: t('appearanceInk') },
+            { value: 'geek', label: t('appearanceGeek') },
           ]}
           onChange={(value) => setAppearance(value as Appearance)}
         />
+      }
+    />
+  )
+}
+
+const AppearanceMotionSetting = () => {
+  const t = useTranslate()
+  const appearance = useSettings((state) => state.appearance)
+  const appearanceMotion = useSettings((state) => state.appearanceMotion)
+  const animated = appearance === 'ink' || appearance === 'geek'
+  return (
+    <SettingCell
+      label={t('settingsAppearanceMotion')}
+      description={
+        animated ? t('settingsAppearanceMotionDescription') : t('settingsAppearanceMotionInactive')
+      }
+      status={null}
+      action={
+        <button
+          type="button"
+          role="switch"
+          aria-checked={appearanceMotion}
+          aria-label={t('settingsAppearanceMotion')}
+          className={clsx(styles.switch, appearanceMotion && styles.switchOn)}
+          disabled={!animated}
+          onClick={() => setAppearanceMotion(!appearanceMotion)}
+        >
+          <span className={styles.switchThumb} />
+        </button>
       }
     />
   )

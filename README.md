@@ -4,7 +4,7 @@
 
 **面向 DeepSeek API 的桌面与 Web 聊天客户端。自己的 Key，自己的数据。**
 
-[下载 Windows 版](https://github.com/dashaeraavretu/DSChat/releases/latest) · [Web 部署](docs/WEB-DEPLOY.md) · [功能](#功能) · [常见问题](#常见问题)
+[下载 Windows 版](https://github.com/dashaeraavretu/DSChat/releases/latest) · [自部署](#自部署) · [外观](#外观) · [功能](#功能) · [常见问题](#常见问题) · [English](README.en.md)
 
 [![Release](https://img.shields.io/github/v/release/dashaeraavretu/DSChat?style=flat-square)](https://github.com/dashaeraavretu/DSChat/releases/latest)
 [![License](https://img.shields.io/github/license/dashaeraavretu/DSChat?style=flat-square)](LICENSE)
@@ -16,6 +16,16 @@
 DSChat 是一个开源、本地优先的 DeepSeek 客户端。桌面版用 Electron 封装为 Windows 应用；Web 版是纯静态站点，可以自己部署到 Cloudflare Pages 等平台。界面沿用 DeepSeek 官方 `chat-demo`，并补上了日常使用需要的提示词预设、角色卡导入、引用回复、导出图片、临时会话等功能。
 
 **不需要账号，没有官方后端，没有遥测。** 每位使用者填写自己的 DeepSeek API Key，会话和附件保存在本机。
+
+## 自部署
+
+DSChat 提供 Web 版与桌面版两种自部署方式，文档都在仓库里：
+
+- **Web 版（推荐 Cloudflare Pages）**：纯静态站点。下载 Release 的 `DSChat-x.y.z-web.zip` 解压上传，或让 Cloudflare 直接连 Git 构建。
+  完整步骤（Cloudflare Pages、Wrangler、GitHub Actions、自定义域名、CSP、CORS、PWA）见 **[docs/WEB-DEPLOY.md](docs/WEB-DEPLOY.md)**。
+- **桌面版自构建 / 自定义 API**：构建安装包、修改 API 地址、代理与安全说明见 **[docs/SELF-HOST.md](docs/SELF-HOST.md)**。
+
+不想自己部署，也可以直接下载 Releases 里的 Windows 安装包。
 
 ## 下载与安装
 
@@ -62,6 +72,18 @@ DSCHAT_API_ORIGIN=https://api.example.com pnpm build
 
 ## 功能
 
+| 分类 | 能力 |
+| --- | --- |
+| 对话 | 多会话、自动标题、搜索、置顶、临时会话、编辑提问、重新生成、消息分支 |
+| 生成 | 流式回答、深度思考、智能搜索、链接阅读、来源引用、停止/继续、错误重试 |
+| 输入 | 文本/图片/PDF/Office 附件、拖拽/粘贴、上传预检、语音输入、朗读、引用回复、输入历史、字数统计 |
+| 提示词 | 预设、酒馆角色卡 V2/V3、变量、开场白、每轮注入、会话快照、预设导出/导入 |
+| 阅读 | Markdown、代码高亮、KaTeX、Mermaid、公式复制、舒适/宽阅读宽度 |
+| 导出 | 单会话 Markdown、会话/消息图片、全量历史 ZIP、诊断日志 |
+| 桌面 | 窗口记忆、托盘、关闭到托盘、缩放、HTTP/SOCKS5 代理、完成通知、更新检查 |
+| Web | PWA 安装、离线外壳、Cloudflare Pages、会话级 API Key、安全响应头 |
+| 外观 | 原版 / TUI / 胖鱼 / 纸张 / 水墨 / 极客，浅色/深色/跟随系统，中英文 |
+
 ### 对话
 
 - 多会话、自动标题、重命名、删除；会话搜索、置顶、临时会话。
@@ -90,13 +112,34 @@ DSCHAT_API_ORIGIN=https://api.example.com pnpm build
 - Markdown、代码高亮、KaTeX 公式、Mermaid 图表。
 - 行间公式悬停复制；舒适/宽阅读宽度。
 - 单会话导出 Markdown；会话/消息导出为图片；全量历史 ZIP 导入导出。
-- 三套可选外观（原版 / TUI / 胖鱼 / 纸张），浅色、深色、跟随系统；中英文界面。
+- 六套可选外观（原版 / TUI / 胖鱼 / 纸张 / 水墨 / 极客），浅色、深色、跟随系统；中英文界面。
 
 ### 桌面与 Web
 
 - 桌面版：窗口位置记忆、托盘、关闭到托盘、完成通知、界面缩放、HTTP/SOCKS5 代理、诊断日志导出。
 - 关于页「检查更新」：查询 GitHub Releases，有更新时打开下载页，不自动安装。
 - Web 版：可安装为 PWA，支持应用外壳离线缓存；可部署到 Cloudflare Pages。
+
+## 外观
+
+设置 → 通用 → 外观 可切换六套风格，全部只覆盖 token，不改消息区布局：
+
+- **原版**：官方 `chat-demo` 外观。
+- **TUI**：Gruvbox 暖色、方角、终端感。
+- **胖鱼**：青绿 + 珊瑚、大圆角、原创吉祥物。
+- **纸张**：暖白、低饱和、衬线标题。
+- **水墨**：宣纸、墨晕、朱砂强调；WebGL 动态背景。
+- **极客**：冷色网格、粒子、扫描线；WebGL 动态背景。
+
+水墨和极客背景会遵循系统的「减少动态效果」，也可以在设置里关闭动态背景。实现方式与参考的博客/WebGL 技术见 [docs/APPEARANCE.md](docs/APPEARANCE.md)。
+
+| 水墨（浅色） | 水墨（深色） |
+| --- | --- |
+| ![水墨浅色](docs/screenshots/ink-light.png) | ![水墨深色](docs/screenshots/ink-dark.png) |
+
+| 极客（浅色） | 极客（深色） |
+| --- | --- |
+| ![极客浅色](docs/screenshots/geek-light.png) | ![极客深色](docs/screenshots/geek-dark.png) |
 
 ## 隐私与数据
 
@@ -142,16 +185,19 @@ Web 版从浏览器直接请求 API，服务端需要允许你的站点源。桌
 | `pnpm dev:desktop` | Electron + 开发服务器 |
 | `pnpm build` | 构建 Web 静态产物到 `dist/` |
 | `pnpm dist:win` | 构建 Windows 安装包 |
+| `pnpm dist:web` | 构建 Web 静态产物并打包为 `DSChat-x.y.z-web.zip` |
 | `pnpm dist:test` | 构建千机测试包（不对外分发） |
+| `pnpm deploy:cf` | 构建并部署到 Cloudflare Pages |
 | `pnpm type` / `pnpm lint` | 类型检查 / Lint |
 | `pnpm test` | 无头回归测试 |
 | `pnpm test:proxy` | 主进程 API 代理冒烟 |
 | `pnpm test:update` | 更新检查冒烟 |
 
-更多文档：
+## 文档
 
-- [Web 部署与 Cloudflare Pages](docs/WEB-DEPLOY.md)
-- [自部署、自定义 API 与安全说明](docs/SELF-HOST.md)
+- **[Web 部署与 Cloudflare Pages](docs/WEB-DEPLOY.md)**：Git 集成、Wrangler、GitHub Actions、自定义域名、CSP/CORS、PWA。
+- **[自部署、自定义 API 与安全说明](docs/SELF-HOST.md)**：桌面版构建、API 地址、Key 存储、代理与分发。
+- **[外观系统与 WebGL 背景](docs/APPEARANCE.md)**：六套外观、水墨/极客 shader、参考的博客与最佳实践。
 - [功能对齐清单](docs/FEATURE-PARITY.md)
 - [手动验收清单](docs/QA-CHECKLIST.md)
 - [更新日志](CHANGELOG.md)

@@ -3,6 +3,26 @@
 All notable changes to DSChat are recorded here. Versions follow `package.json`
 and release tags use the `vX.Y.Z` form.
 
+## 0.6.0 — 2026-11-19
+
+### Added
+
+- **Ink** appearance: paper background, animated ink-wash WebGL layer,
+  vermilion accents, serif headings.
+- **Geek** appearance: cool grid, drifting particles, scanlines and a cyan/green
+  WebGL background.
+- Appearance motion setting; Ink/Geek backgrounds respect
+  `prefers-reduced-motion` and pause when the page is hidden.
+- Appearance design notes and WebGL references in `docs/APPEARANCE.md`.
+
+### Changed
+
+- Sidebar: more breathing room between **New chat** and the session search,
+  search icon and `Ctrl K` hint, clearer focus state.
+- README now shows the six appearances with screenshots, a self-hosting section
+  with direct links to `docs/WEB-DEPLOY.md` and `docs/SELF-HOST.md`, and a
+  feature overview table.
+
 ## 0.5.0 — 2026-11-19
 
 ### Added

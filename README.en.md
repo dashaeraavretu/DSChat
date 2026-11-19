@@ -4,7 +4,7 @@
 
 **A desktop and web chat client for the DeepSeek API. Your key, your data.**
 
-[Download for Windows](https://github.com/dashaeraavretu/DSChat/releases/latest) · [Deploy the web build](docs/WEB-DEPLOY.md) · [Features](#features) · [FAQ](#faq)
+[Download for Windows](https://github.com/dashaeraavretu/DSChat/releases/latest) · [Self-hosting](#self-hosting) · [Appearance](#appearance) · [Features](#features) · [FAQ](#faq)
 
 [![Release](https://img.shields.io/github/v/release/dashaeraavretu/DSChat?style=flat-square)](https://github.com/dashaeraavretu/DSChat/releases/latest)
 [![License](https://img.shields.io/github/license/dashaeraavretu/DSChat?style=flat-square)](LICENSE)
@@ -16,6 +16,13 @@
 DSChat is an open-source, local-first DeepSeek client. The desktop build wraps the official `chat-demo` interface in Electron; the web build is a static site you can host on Cloudflare Pages or any static host. It keeps the original interface and adds prompt presets, character-card import, quote replies, image export, temporary chats, and other everyday features.
 
 **No account, no backend, no telemetry.** Every user brings their own DeepSeek API key; conversations and attachments stay on their device.
+
+## Self-hosting
+
+- **Web build (Cloudflare Pages recommended):** download `DSChat-x.y.z-web.zip` from a release and upload it, or connect the repository to Cloudflare Pages and build with `pnpm build` / output `dist`. Full instructions: **[docs/WEB-DEPLOY.md](docs/WEB-DEPLOY.md)**.
+- **Desktop build / custom API:** build the installer, change the API origin, and review proxy/security notes in **[docs/SELF-HOST.md](docs/SELF-HOST.md)**.
+
+You can also skip self-hosting and use the Windows installer from Releases.
 
 ## Download and install
 
@@ -90,13 +97,29 @@ See **[docs/WEB-DEPLOY.md](docs/WEB-DEPLOY.md)** for custom domains, CORS, secur
 - Markdown, syntax highlighting, KaTeX math, and Mermaid diagrams.
 - Hover-to-copy display math; comfortable/wide reading width.
 - Export a single conversation as Markdown, a conversation as an image, or all history as ZIP.
-- Optional appearance presets (original / TUI / fat fish / paper), light/dark/system themes, Chinese and English UI.
+- Optional appearance presets (original / TUI / fat fish / paper / ink / geek), light/dark/system themes, Chinese and English UI.
 
 ### Desktop and web
 
 - Desktop: window-position memory, tray, close-to-tray, completion notifications, zoom, HTTP/SOCKS5 proxy, and diagnostics export.
 - About → Check for updates: queries GitHub Releases and opens the download page; it never installs automatically.
 - Web: installable PWA with an offline app shell; deployable to Cloudflare Pages.
+
+## Appearance
+
+Settings → General → Appearance switches between six token-only themes without changing the message layout:
+
+- **Original**, **TUI**, **Fat fish**, **Paper**, **Ink** (paper, ink wash, vermilion; WebGL background), **Geek** (cool grid, particles, scanlines; WebGL background).
+- Ink and Geek respect `prefers-reduced-motion` and can be made static in Settings.
+- Implementation notes and references: **[docs/APPEARANCE.md](docs/APPEARANCE.md)**.
+
+| Ink (light) | Ink (dark) |
+| --- | --- |
+| ![Ink light](docs/screenshots/ink-light.png) | ![Ink dark](docs/screenshots/ink-dark.png) |
+
+| Geek (light) | Geek (dark) |
+| --- | --- |
+| ![Geek light](docs/screenshots/geek-light.png) | ![Geek dark](docs/screenshots/geek-dark.png) |
 
 ## Privacy and data
 
@@ -148,10 +171,11 @@ Requirements: Node.js 22.12+ and pnpm.
 | `pnpm test:proxy` | Main-process API proxy smoke test |
 | `pnpm test:update` | Update-check smoke test |
 
-More documentation:
+## Documentation
 
-- [Web deployment and Cloudflare Pages](docs/WEB-DEPLOY.md)
-- [Self-hosting, custom API origins, and security](docs/SELF-HOST.md)
+- **[Web deployment and Cloudflare Pages](docs/WEB-DEPLOY.md)**
+- **[Self-hosting, custom API origins, and security](docs/SELF-HOST.md)**
+- **[Appearance system and WebGL backgrounds](docs/APPEARANCE.md)**
 - [Feature parity checklist](docs/FEATURE-PARITY.md)
 - [Manual QA checklist](docs/QA-CHECKLIST.md)
 - [Changelog](CHANGELOG.md)

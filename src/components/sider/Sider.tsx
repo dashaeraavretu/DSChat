@@ -4,6 +4,7 @@ import { useTranslate } from '../../i18n/index.js'
 import {
   IconChevronDownOutline14,
   IconPanelLeftOutline16,
+  IconSearchOutline16,
   IconSettingsOutline16,
   IconThinkOutline16,
   NewChatIcon,
@@ -120,7 +121,7 @@ export const Sider = ({ mobile = false }: { mobile?: boolean }) => {
       <div className={styles.newChatRow}>
         <button
           type="button"
-          className={styles.newChat}
+          className={clsx(styles.newChat, 'ds-new-chat')}
           onClick={() => {
             newChat()
             closeMobileSider()
@@ -155,21 +156,29 @@ export const Sider = ({ mobile = false }: { mobile?: boolean }) => {
         </Menu>
       </div>
       <div className={styles.searchWrap}>
-        <input
-          ref={searchRef}
-          type="search"
-          className={styles.searchInput}
-          placeholder={t('searchSessionsPlaceholder')}
-          aria-label={t('searchSessionsPlaceholder')}
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === 'Escape') {
-              setQuery('')
-              event.currentTarget.blur()
-            }
-          }}
-        />
+        <div className={clsx(styles.searchField, 'ds-search-field')}>
+          <span className={styles.searchIcon} aria-hidden="true">
+            <IconSearchOutline16 />
+          </span>
+          <input
+            ref={searchRef}
+            type="search"
+            className={clsx(styles.searchInput, 'ds-search-input')}
+            placeholder={t('searchSessionsPlaceholder')}
+            aria-label={t('searchSessionsPlaceholder')}
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Escape') {
+                setQuery('')
+                event.currentTarget.blur()
+              }
+            }}
+          />
+          <kbd className={styles.searchKbd} aria-hidden="true">
+            Ctrl K
+          </kbd>
+        </div>
       </div>
       <div className={styles.listWrap}>
         {query.trim() ? (

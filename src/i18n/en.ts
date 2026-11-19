@@ -112,6 +112,12 @@ export const en = {
   appearanceTui: 'TUI',
   appearanceFish: 'Fat fish',
   appearancePaper: 'Paper',
+  appearanceInk: 'Ink',
+  appearanceGeek: 'Geek',
+  settingsAppearanceMotion: 'Animated background',
+  settingsAppearanceMotionDescription:
+    'The Ink and Geek appearances use a WebGL background; it becomes static when the system requests reduced motion.',
+  settingsAppearanceMotionInactive: 'Only the Ink and Geek appearances use an animated background.',
   settingsShowMascot: 'Show mascot',
   settingsShowMascotDescription: 'Only shown in the Fat fish appearance.',
   settingsInputCount: 'Show character count',

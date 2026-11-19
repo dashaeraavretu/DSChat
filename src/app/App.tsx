@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import clsx from 'clsx'
 import { useTranslate } from '../i18n/index.js'
 import {
   applyProxyPreference,
@@ -44,6 +45,7 @@ import {
 } from '../components/sider/mobileSiderState.js'
 import { requestSearchFocus } from '../components/sider/searchFocusState.js'
 import { MobileSider, Sider } from '../components/sider/Sider.js'
+import { BackgroundFx } from './BackgroundFx.js'
 import styles from './App.module.css'
 
 export const App = () => {
@@ -172,7 +174,8 @@ export const App = () => {
 
   return (
     <>
-      <div ref={frameRef} className={styles.frame}>
+      <BackgroundFx />
+      <div ref={frameRef} className={clsx(styles.frame, 'ds-app-frame')}>
         {isMobile ? <MobileSider /> : siderCollapsed ? null : <Sider />}
         <main className={styles.main}>
           {saveError ? (
