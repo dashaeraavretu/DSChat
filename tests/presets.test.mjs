@@ -340,6 +340,51 @@ await test('persisted presets round-trip through a fresh import', async () => {
   assert.equal(loaded.source, 'chara-v2')
 })
 
+await test('parsePresetBundle accepts only the declared format and sanitizes fields', async () => {
+  const { module } = await importWithSeed()
+  assert.equal(module.parsePresetBundle(null), null)
+  assert.equal(module.parsePresetBundle({ format: 'other', presets: [] }), null)
+  assert.equal(module.parsePresetBundle({ format: 'dschat-presets' }), null)
+
+  const items = module.parsePresetBundle({
+    format: 'dschat-presets',
+    presets: [
+      null,
+      { name: '   ' },
+      {
+        name: '  Writer  ',
+        system: 'sys',
+        greeting: 'hi',
+        description: 'desc',
+        tags: ['a', 3, 'b'],
+        creator: 'me',
+      },
+      { name: 'x'.repeat(150) },
+    ],
+  })
+  assert.ok(items)
+  assert.equal(items.length, 2)
+  assert.equal(items[0].name, 'Writer')
+  assert.equal(items[0].system, 'sys')
+  assert.equal(items[0].greeting, 'hi')
+  assert.equal(items[0].description, 'desc')
+  assert.deepEqual(items[0].tags, ['a', 'b'])
+  assert.equal(items[0].creator, 'me')
+  assert.equal(items[1].name.length, 100)
+})
+
+await test('parsePresetBundle caps the number of imported presets', async () => {
+  const { module } = await importWithSeed()
+  const presets = Array.from({ length: 250 }, (_, index) => ({
+    name: `Preset ${index}`,
+    system: '',
+    greeting: '',
+  }))
+  const items = module.parsePresetBundle({ format: 'dschat-presets', presets })
+  assert.ok(items)
+  assert.equal(items.length, 200)
+})
+
 console.log(`\n${passes.length} passed, ${failures.length} failed`)
 if (failures.length > 0) {
   process.exitCode = 1

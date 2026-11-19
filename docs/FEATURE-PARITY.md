@@ -596,5 +596,5 @@
 11. **朗读与语音依赖服务端**：ASR/TTS 不可用时输入和朗读入口会报错；桌面版不做本地识别或本地语音合成。
 12. **自动更新与签名**：未包含自动更新；未签名安装包会触发 SmartScreen。代码签名与更新源属于发布配置，不在功能复刻范围内。
 13. **包元数据**：`package.json` 的 `name` 已统一为 `dschat`，`description` 与 `productName` 均为 DSChat；发布前仍建议核对安装包属性中的 ProductName/FileVersion。
-14. **`README.zh-CN.md`**：按任务边界未修改，仍是上游网页版说明；英文 README 与 `docs/` 描述桌面版。后续可由维护者同步中文文档。
+14. **README**：`README.md` 为中文默认版（面向用户），`README.en.md` 为英文版；内部功能/验收细节见 `docs/` 下的文档。
 15. **并行开发影响**：`src/`、`electron/`、`package.json` 由其他工作流修改，本文基于编写时可见实现；最终验收需以完整构建和 `node tests/smoke.mjs`、`pnpm type`、`pnpm lint` 为准。

@@ -30,6 +30,7 @@ import {
   setNotifyOnComplete,
   setNotifySound,
   setReadingWidth,
+  setRememberWebApiKey,
   setSendKey,
   setShowInputCount,
   setProxyPreference,
@@ -47,12 +48,7 @@ import {
   type TtsSpeed,
   type ZoomFactor,
 } from '../../services/settings.js'
-import {
-  API_MODEL,
-  API_ORIGIN,
-  APP_VERSION,
-  FEATURES,
-} from '../../services/buildInfo.js'
+import { API_MODEL, API_ORIGIN, APP_VERSION, FEATURES } from '../../services/buildInfo.js'
 import { useTranslate, type TranslationKey, type TranslationMessage } from '../../i18n/index.js'
 import { Button } from '../base/Button.js'
 import { Modal } from '../base/Modal.js'
@@ -161,6 +157,7 @@ const SettingsContent = () => {
           ) : (
             <>
               <ApiKeyField editor={apiKeyEditor} />
+              <WebKeyPersistenceSetting />
               {apiKeyEditor.hasApiKey ? (
                 <SettingCell
                   label={t('apiKeyClear')}
@@ -257,19 +254,10 @@ const ClearKeyConfirm = ({ clearKey }: { clearKey: ReturnType<typeof useClearKey
       onClose={clearKey.cancel}
       footer={
         <div className={styles.deleteActions} aria-busy={clearKey.busy}>
-          <Button
-            variant="outlined"
-            autoFocus
-            disabled={clearKey.busy}
-            onClick={clearKey.cancel}
-          >
+          <Button variant="outlined" autoFocus disabled={clearKey.busy} onClick={clearKey.cancel}>
             {t('cancel')}
           </Button>
-          <Button
-            variant="danger"
-            disabled={clearKey.busy}
-            onClick={() => void clearKey.confirm()}
-          >
+          <Button variant="danger" disabled={clearKey.busy} onClick={() => void clearKey.confirm()}>
             {t(clearKey.busy ? 'apiKeyClearing' : 'apiKeyClearConfirm')}
           </Button>
         </div>
@@ -553,6 +541,34 @@ const errorStatus = (key: TranslationKey, error: unknown): Status => ({
   error: true,
 })
 
+const WebKeyPersistenceSetting = () => {
+  const t = useTranslate()
+  const rememberWebApiKey = useSettings((state) => state.rememberWebApiKey)
+  const desktop = isDesktopApp()
+  if (desktop) {
+    return null
+  }
+  return (
+    <SettingCell
+      label={t('settingsRememberApiKey')}
+      description={t('settingsRememberApiKeyDescription')}
+      status={null}
+      action={
+        <button
+          type="button"
+          role="switch"
+          aria-checked={rememberWebApiKey}
+          aria-label={t('settingsRememberApiKey')}
+          className={clsx(styles.switch, rememberWebApiKey && styles.switchOn)}
+          onClick={() => setRememberWebApiKey(!rememberWebApiKey)}
+        >
+          <span className={styles.switchThumb} />
+        </button>
+      }
+    />
+  )
+}
+
 const CloseToTraySetting = () => {
   const t = useTranslate()
   const closeToTray = useSettings((state) => state.closeToTray)
@@ -560,7 +576,9 @@ const CloseToTraySetting = () => {
   return (
     <SettingCell
       label={t('settingsCloseToTray')}
-      description={desktop ? t('settingsCloseToTrayDescription') : t('settingsCloseToTrayDesktopOnly')}
+      description={
+        desktop ? t('settingsCloseToTrayDescription') : t('settingsCloseToTrayDesktopOnly')
+      }
       status={null}
       action={
         <button
@@ -849,6 +867,7 @@ const AboutDialog = ({ onClose }: { onClose: () => void }) => {
   const [exporting, setExporting] = useState(false)
   const [checkingUpdate, setCheckingUpdate] = useState(false)
   const [updateResult, setUpdateResult] = useState<DesktopUpdateResult | null>(null)
+  const [shortcutsOpen, setShortcutsOpen] = useState(false)
   const bridge = window.desktop
   const featureLabels = [
     FEATURES.files ? t('aboutFeatureFiles') : null,
@@ -875,9 +894,7 @@ const AboutDialog = ({ onClose }: { onClose: () => void }) => {
         features: FEATURES,
       })
       showToast(
-        ok
-          ? { key: 'diagnosticsExported' }
-          : { key: 'diagnosticsExportFailed', type: 'error' }
+        ok ? { key: 'diagnosticsExported' } : { key: 'diagnosticsExportFailed', type: 'error' }
       )
     } finally {
       setExporting(false)
@@ -925,83 +942,127 @@ const AboutDialog = ({ onClose }: { onClose: () => void }) => {
   })()
 
   return (
-    <Modal
-      title={t('aboutTitle')}
-      className={styles.aboutDialog}
-      onClose={onClose}
-      footer={
-        <div className={styles.deleteActions}>
-          <Button variant="outlined" onClick={onClose}>
-            {t('close')}
-          </Button>
-          <Button
-            variant="primary"
-            disabled={exporting || !bridge?.exportDiagnostics}
-            onClick={() => void exportLogs()}
-          >
-            {t(exporting ? 'diagnosticsExporting' : 'diagnosticsExport')}
-          </Button>
-        </div>
-      }
-    >
-      <div className={styles.aboutRows}>
-        <div className={styles.aboutRow}>
-          <span className={styles.aboutLabel}>{t('aboutVersion')}</span>
-          <span className={styles.aboutValue}>{APP_VERSION}</span>
-        </div>
-        <div className={styles.aboutRow}>
-          <span className={styles.aboutLabel}>{t('aboutEndpoint')}</span>
-          <span className={styles.aboutValue}>{API_ORIGIN}</span>
-        </div>
-        <div className={styles.aboutRow}>
-          <span className={styles.aboutLabel}>{t('aboutModel')}</span>
-          <span className={styles.aboutValue}>{API_MODEL}</span>
-        </div>
-        <div className={styles.aboutRow}>
-          <span className={styles.aboutLabel}>{t('aboutFeatures')}</span>
-          <span className={styles.aboutValue}>
-            {featureLabels.length > 0 ? featureLabels.join(' / ') : t('aboutNone')}
-          </span>
-        </div>
-        {bridge?.checkForUpdate ? (
+    <>
+      <Modal
+        title={t('aboutTitle')}
+        className={styles.aboutDialog}
+        onClose={onClose}
+        footer={
+          <div className={styles.deleteActions}>
+            <Button variant="outlined" onClick={onClose}>
+              {t('close')}
+            </Button>
+            <Button
+              variant="primary"
+              disabled={exporting || !bridge?.exportDiagnostics}
+              onClick={() => void exportLogs()}
+            >
+              {t(exporting ? 'diagnosticsExporting' : 'diagnosticsExport')}
+            </Button>
+          </div>
+        }
+      >
+        <div className={styles.aboutRows}>
           <div className={styles.aboutRow}>
-            <span className={styles.aboutLabel}>{t('aboutUpdates')}</span>
+            <span className={styles.aboutLabel}>{t('aboutVersion')}</span>
+            <span className={styles.aboutValue}>{APP_VERSION}</span>
+          </div>
+          <div className={styles.aboutRow}>
+            <span className={styles.aboutLabel}>{t('aboutEndpoint')}</span>
+            <span className={styles.aboutValue}>{API_ORIGIN}</span>
+          </div>
+          <div className={styles.aboutRow}>
+            <span className={styles.aboutLabel}>{t('aboutModel')}</span>
+            <span className={styles.aboutValue}>{API_MODEL}</span>
+          </div>
+          <div className={styles.aboutRow}>
+            <span className={styles.aboutLabel}>{t('aboutFeatures')}</span>
+            <span className={styles.aboutValue}>
+              {featureLabels.length > 0 ? featureLabels.join(' / ') : t('aboutNone')}
+            </span>
+          </div>
+          {bridge?.checkForUpdate ? (
+            <div className={styles.aboutRow}>
+              <span className={styles.aboutLabel}>{t('aboutUpdates')}</span>
+              <span className={styles.aboutValue}>
+                <button
+                  type="button"
+                  className={styles.aboutLink}
+                  disabled={checkingUpdate}
+                  onClick={() => void checkUpdate()}
+                >
+                  {t(checkingUpdate ? 'aboutCheckingUpdate' : 'aboutCheckUpdate')}
+                </button>
+                {updateMessage ? (
+                  <span className={styles.aboutUpdateMessage}>{updateMessage}</span>
+                ) : null}
+                {updateResult?.ok && updateResult.hasUpdate ? (
+                  <button
+                    type="button"
+                    className={styles.aboutLink}
+                    onClick={() => void openUpdatePage()}
+                  >
+                    {t('aboutOpenDownload')}
+                  </button>
+                ) : null}
+              </span>
+            </div>
+          ) : null}
+          <div className={styles.aboutRow}>
+            <span className={styles.aboutLabel}>{t('aboutShortcuts')}</span>
             <span className={styles.aboutValue}>
               <button
                 type="button"
                 className={styles.aboutLink}
-                disabled={checkingUpdate}
-                onClick={() => void checkUpdate()}
+                onClick={() => setShortcutsOpen(true)}
               >
-                {t(checkingUpdate ? 'aboutCheckingUpdate' : 'aboutCheckUpdate')}
+                {t('aboutViewShortcuts')}
               </button>
-              {updateMessage ? (
-                <span className={styles.aboutUpdateMessage}>{updateMessage}</span>
-              ) : null}
-              {updateResult?.ok && updateResult.hasUpdate ? (
-                <button
-                  type="button"
-                  className={styles.aboutLink}
-                  onClick={() => void openUpdatePage()}
-                >
-                  {t('aboutOpenDownload')}
-                </button>
-              ) : null}
             </span>
           </div>
-        ) : null}
-      </div>
-      {disabledLabels.length > 0 ? (
-        <div className={styles.aboutWarning}>
-          {t('aboutTestBuildWarning', { features: disabledLabels.join(' / ') })}
         </div>
+        {disabledLabels.length > 0 ? (
+          <div className={styles.aboutWarning}>
+            {t('aboutTestBuildWarning', { features: disabledLabels.join(' / ') })}
+          </div>
+        ) : null}
+        <div className={styles.aboutDescription}>{t('diagnosticsDescription')}</div>
+        <div className={styles.aboutDescription}>
+          {t('thirdPartyLicenses')}: React, Zustand, KaTeX, Mermaid, Prism, idb, fflate, Twemoji
+          (CC-BY 4.0) · THIRD_PARTY_NOTICES.md
+        </div>
+      </Modal>
+      {shortcutsOpen ? (
+        <Modal
+          title={t('aboutShortcutsTitle')}
+          className={styles.aboutDialog}
+          onClose={() => setShortcutsOpen(false)}
+          footer={
+            <Button variant="outlined" onClick={() => setShortcutsOpen(false)}>
+              {t('close')}
+            </Button>
+          }
+        >
+          <div className={styles.shortcutList}>
+            {[
+              ['Ctrl+N', t('shortcutNewChat')],
+              ['Ctrl+K', t('shortcutSearch')],
+              ['Ctrl+,', t('shortcutSettings')],
+              ['Esc', t('shortcutEscape')],
+              ['Enter', t('shortcutSend')],
+              ['Ctrl+Enter', t('shortcutSendCtrl')],
+              ['Shift+Enter', t('shortcutNewline')],
+              ['↑ / ↓', t('shortcutHistory')],
+            ].map(([keys, label]) => (
+              <div key={keys} className={styles.shortcutRow}>
+                <kbd className={styles.shortcutKeys}>{keys}</kbd>
+                <span>{label}</span>
+              </div>
+            ))}
+          </div>
+        </Modal>
       ) : null}
-      <div className={styles.aboutDescription}>{t('diagnosticsDescription')}</div>
-      <div className={styles.aboutDescription}>
-        {t('thirdPartyLicenses')}: React, Zustand, KaTeX, Mermaid, Prism, idb, fflate, Twemoji (CC-BY 4.0) ·
-        THIRD_PARTY_NOTICES.md
-      </div>
-    </Modal>
+    </>
   )
 }
 

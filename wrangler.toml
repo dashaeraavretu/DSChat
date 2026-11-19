@@ -1,0 +1,6 @@
+# Cloudflare Pages 配置。
+# Git 集成：构建命令 `pnpm build`，输出目录 `dist`。
+# 命令行：pnpm dlx wrangler pages deploy dist --project-name dschat
+name = "dschat"
+pages_build_output_dir = "./dist"
+compatibility_date = "2026-11-19"

@@ -21,6 +21,51 @@ export type Preset = {
 /** 会话创建时固化的快照，之后修改预设不影响已有会话 */
 export type PresetSnapshot = Pick<Preset, 'id' | 'name' | 'system' | 'greeting'>
 
+export type PresetBundleItem = {
+  name: string
+  system: string
+  greeting: string
+  description?: string
+  tags?: string[]
+  creator?: string
+}
+
+/**
+ * 解析 `dschat-presets` 导出包。只接受声明的格式；截断超长字段并限制数量，
+ * 避免异常文件拖垮设置页。返回 null 表示不是有效的预设包。
+ */
+export const parsePresetBundle = (input: unknown): PresetBundleItem[] | null => {
+  if (!input || typeof input !== 'object') {
+    return null
+  }
+  const bundle = input as { format?: unknown; presets?: unknown }
+  if (bundle.format !== 'dschat-presets' || !Array.isArray(bundle.presets)) {
+    return null
+  }
+  const items: PresetBundleItem[] = []
+  for (const value of bundle.presets.slice(0, 200)) {
+    if (!value || typeof value !== 'object') {
+      continue
+    }
+    const item = value as Record<string, unknown>
+    if (typeof item.name !== 'string' || !item.name.trim()) {
+      continue
+    }
+    items.push({
+      name: item.name.trim().slice(0, MAX_NAME_LENGTH),
+      system: typeof item.system === 'string' ? item.system.slice(0, 200_000) : '',
+      greeting: typeof item.greeting === 'string' ? item.greeting.slice(0, 50_000) : '',
+      description:
+        typeof item.description === 'string' ? item.description.slice(0, 500) : undefined,
+      tags: Array.isArray(item.tags)
+        ? item.tags.filter((tag): tag is string => typeof tag === 'string').slice(0, 20)
+        : undefined,
+      creator: typeof item.creator === 'string' ? item.creator.slice(0, 200) : undefined,
+    })
+  }
+  return items
+}
+
 const PRESETS_KEY = 'chat-demo:presets-v1'
 const DEFAULT_KEY = 'chat-demo:default-preset'
 const MAX_NAME_LENGTH = 100
@@ -73,10 +118,8 @@ const normalizePreset = (value: unknown): Preset | null => {
       ? item.tags.filter((tag): tag is string => typeof tag === 'string').slice(0, 20)
       : undefined,
     creator: typeof item.creator === 'string' ? item.creator : undefined,
-    characterVersion:
-      typeof item.characterVersion === 'string' ? item.characterVersion : undefined,
-    source:
-      item.source === 'chara-v2' || item.source === 'chara-v3' ? item.source : 'manual',
+    characterVersion: typeof item.characterVersion === 'string' ? item.characterVersion : undefined,
+    source: item.source === 'chara-v2' || item.source === 'chara-v3' ? item.source : 'manual',
     updatedAt: typeof item.updatedAt === 'number' ? item.updatedAt : Date.now(),
   }
 }
