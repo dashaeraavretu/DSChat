@@ -2,7 +2,7 @@
 
 本文面向自行构建、内部部署或二次分发的用户，说明环境准备、开发与打包命令、API Key 的获取与存储、自定义 API 地址、分发合规和常见问题。
 
-DSChat 是 [deepseek-ai/chat-demo](https://github.com/deepseek-ai/chat-demo) 的 Electron 桌面封装。应用没有自有后端：渲染进程直接请求构建时配置的 DeepSeek API 服务。每个最终用户使用自己的 API Key。
+DSChat 是 [deepseek-ai/chat-demo](https://github.com/deepseek-ai/chat-demo) 的 Electron 桌面封装。应用没有自有后端：桌面版的所有 API 请求由主进程代理到构建时配置的 DeepSeek API 服务。每个最终用户使用自己的 API Key。
 
 ## 1. 环境要求
 
@@ -106,16 +106,16 @@ pnpm dist:test   # 产物：release-test/DSChat-0.2.0-qianji-test-x64.exe
   ```
 
 - 写入采用“临时文件 + rename”，降低进程中断导致文件损坏的风险；设置页提供“清除 API Key”，确认后删除该文件、清空主进程内存，并清理旧 localStorage 键。
-- `safeStorage.isEncryptionAvailable()` 返回 false 的少数环境（例如未配置密钥环的 Linux 桌面）会退化为明文 `"encrypted": false`，设置页显示“未加密/降级”。这是明确的降级路径，不是正常状态；此时任何能读取该用户文件的本地程序都可能拿到 Key。Windows 正常安装下不会走该分支。
-- 若 IPC 保存失败，渲染层会回退到 `localStorage`（重启后仍加载），设置页同样显示“未加密/降级”。排查时应检查 `secrets.json` 的权限和磁盘状态。
-- preload 通过 `contextBridge` 只暴露 `isDesktop`、解密后的 `apiKey`、`setApiKey()` 和 `version`；渲染进程没有 Node.js 权限（`contextIsolation: true`、`sandbox: true`、`nodeIntegration: false`）。
-- Key 会出现在主进程与渲染进程内存中；能控制当前操作系统账户或读取进程内存的恶意软件仍可获取。请使用系统账户加密、及时锁屏，并避免把 `secrets.json` 纳入备份或云同步。
+- `safeStorage.isEncryptionAvailable()` 返回 false 的少数环境（例如未配置密钥环的 Linux 桌面）不会写明文文件：Key 只保存在本次运行的主进程内存中，设置页显示“未加密/降级”，重启后需要重新输入。Windows 正常安装下会使用系统加密。
+- 若主进程保存失败，界面会回滚到之前的状态并提示；桌面端不会把 Key 写入 `localStorage`，也不会写明文 `secrets.json`。排查时应检查 `secrets.json` 的权限和磁盘状态。
+- preload 通过 `contextBridge` 只暴露 `isDesktop`、`hasApiKey`、`setApiKey()`、`verifyAndSaveApiKey()`、代理请求/流方法与 `version`；不再暴露解密后的 Key。渲染进程没有 Node.js 权限（`contextIsolation: true`、`sandbox: true`、`nodeIntegration: false`）。
+- 真实 Key 只出现在主进程内存中；渲染进程既拿不到 Key，也不能直连 API。能控制当前操作系统账户或读取进程内存的恶意软件仍可获取 Key，请使用系统账户加密、及时锁屏，并避免把 `secrets.json` 纳入备份或云同步。
 
 ### 网页版
 
 网页版的 API Key 与设置保存在浏览器 `localStorage`，Key 的键名为 `chat-demo:api-key`，为明文。其他设置键包括 `chat-demo:locale`、`chat-demo:theme-preference`、`chat-demo:location`、`chat-demo:tts-voice`、`chat-demo:thinking`、`chat-demo:search`、`chat-demo:sider-collapsed`。仅应在可信浏览器配置文件和可信设备上使用网页版。
 
-从网页版升级到桌面版时，应用会尝试把 `localStorage` 中遗留的 Key 迁移到系统加密存储；迁移成功后才删除旧键。
+从网页版升级到桌面版时，应用会尝试把 `localStorage` 中遗留的 Key 交给主进程迁移；主进程可能加密落盘，也可能因 safeStorage 不可用而只保留在内存中。无论哪种方式，迁移成功后都会删除 localStorage 中的明文旧键。
 
 ### 通用原则
 
@@ -142,12 +142,12 @@ set DSCHAT_API_ORIGIN=https://api.example.com && pnpm build
 
 注意：
 
-- 该值在构建时固化，不是运行时设置；修改后必须重新执行 `pnpm build`，并重新打包桌面应用。
+- 该值在构建时固化，不是运行时设置；修改后必须重新执行 `pnpm build`，并重新打包桌面应用。构建脚本会把解析结果写入 `electron/provider-config.json`，主进程用它作为默认 provider 和代理白名单，因此安装包不依赖用户机器上的环境变量。
 - 服务需兼容 demo 使用的 Anthropic Messages / Files 协议，并支持搜索、链接阅读、标题、`latest_reminder`、ASR/TTS 等扩展能力。仅实现普通聊天时，对应功能会失败或不可用。
 - 使用 HTTPS。自定义网关若能看到请求，也能看到用户的 API Key 与对话内容，必须信任该网关并明确告知用户。
-- 网页版从其他源访问该 API 时，服务端需允许相应 CORS；桌面版从 `dsc://app` 源经 Chromium 网络栈直接请求，服务端同样需要允许该来源，否则打包版会请求失败。若目标服务无法配置 CORS，需要在主进程增加代理转发（当前未实现）。
+- 桌面版的 Messages、Files、ASR、TTS 与模型校验全部由主进程代理发出，不使用渲染层的 CORS，因此目标服务不需要允许 `dsc://app`；网页版从其他源访问时仍需服务端允许相应 CORS。主进程只允许把代理指向构建期 origin（官方、千机或 `DSCHAT_API_ORIGIN`），单次请求不能指定任意 URL。
 - 服务端还需接受请求中的扩展字段（`deepseek_web_search`、`deepseek_read_url`、`title`、`latest_reminder`、`safety_check`、Files API beta）。
-- 不要把 `DSCHAT_API_ORIGIN` 当作安全边界：客户端构建产物中的地址可被修改。
+- 不要把 `DSCHAT_API_ORIGIN` 当作安全边界：客户端构建产物中的地址可被修改。主进程的 allowlist 只保证“Key 不会被发往构建期配置之外的主机”，不能防止构建者自己指定恶意网关。
 
 ## 7. 分发注意事项
 
@@ -182,8 +182,9 @@ set DSCHAT_API_ORIGIN=https://api.example.com && pnpm build
 
 ### 代理与网络
 
-- 桌面版使用 Chromium 网络栈，默认跟随 Windows 系统代理。启动前设置 `HTTPS_PROXY` / `HTTP_PROXY` 可能对部分请求生效，但以系统代理设置为准。
-- 需要强制代理时，可用 Electron/Chromium 的 `--proxy-server=...` 启动参数做诊断；不要把代理凭据写入仓库。
+- 桌面版使用 Chromium 网络栈，默认跟随 Windows 系统代理。设置「通用 → 网络代理」可切换跟随系统 / 手动 HTTP / SOCKS5；修改后主进程会关闭现有连接，新请求使用新配置。
+- 启动前设置 `HTTPS_PROXY` / `HTTP_PROXY` 可能对部分请求生效，但以系统或应用内代理设置为准。
+- 需要强制代理时，也可用 Electron/Chromium 的 `--proxy-server=...` 启动参数做诊断；不要把代理凭据写入仓库。
 - SSE 流式响应需要代理支持长连接且不缓冲响应体；若回答一次性出现或超时，优先检查代理、网关和防火墙。
 - 企业 TLS 拦截需要把根证书装入系统信任库，否则请求会因证书错误失败。
 

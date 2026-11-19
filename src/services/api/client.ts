@@ -1,5 +1,16 @@
-import { translate, type TranslationMessage } from '../../i18n/index.js'
-import { API_MODEL, FEATURES, MESSAGES_BASE, MODELS_URL, VERIFY_MODE } from '../buildInfo.js'
+import {
+  isTranslationKey,
+  translate,
+  type TranslationMessage,
+} from '../../i18n/index.js'
+import {
+  API_MODEL,
+  API_ORIGIN,
+  FEATURES,
+  MESSAGES_BASE,
+  MODELS_URL,
+  VERIFY_MODE,
+} from '../buildInfo.js'
 import { readMessageEvent } from './parseEvent.js'
 import { readServerSentEvents } from './sse.js'
 import type {
@@ -29,6 +40,14 @@ export type ApiErrorKind =
   /** 响应不符合协议（如非 SSE 响应） */
   | 'protocol'
 
+const API_ERROR_KINDS: readonly ApiErrorKind[] = [
+  'http',
+  'stream',
+  'network',
+  'interrupted',
+  'protocol',
+]
+
 export class ApiError extends Error {
   readonly localMessage?: TranslationMessage
 
@@ -41,6 +60,17 @@ export class ApiError extends Error {
     this.name = 'ApiError'
     this.localMessage = typeof message === 'string' ? undefined : message
   }
+}
+
+/** 把主进程返回的脱敏错误映射回渲染层原有的 ApiError 分类 */
+export const apiErrorFromBridge = (error?: DesktopApiError): ApiError => {
+  const kind =
+    error?.kind && API_ERROR_KINDS.includes(error.kind) ? (error.kind as ApiErrorKind) : 'network'
+  const localMessage =
+    error?.localMessageKey && isTranslationKey(error.localMessageKey)
+      ? { key: error.localMessageKey }
+      : undefined
+  return new ApiError(kind, localMessage ?? (error?.message || 'Request failed'), error?.status)
 }
 
 const isErrorBody = (value: unknown): value is ApiErrorBody =>
@@ -90,12 +120,219 @@ const anthropicHeaders = (apiKey: string, beta: boolean): Record<string, string>
   ...(beta ? { 'anthropic-beta': FILES_BETA } : {}),
 })
 
+const desktopBridge = (): DesktopBridge | undefined => {
+  if (typeof window === 'undefined' || typeof window.desktop === 'undefined') {
+    return undefined
+  }
+  const bridge = window.desktop
+  return bridge && bridge.isDesktop && typeof bridge.apiRequest === 'function' ? bridge : undefined
+}
+
+/** 桌面端启动时把构建期 provider 交给主进程；不包含任何 Key */
+let desktopConfigured: Promise<DesktopBridge> | null = null
+
+const requireDesktopBridge = async (): Promise<DesktopBridge> => {
+  const bridge = desktopBridge()
+  if (!bridge) {
+    throw new ApiError('network', 'Desktop API bridge is unavailable')
+  }
+  if (!desktopConfigured) {
+    desktopConfigured = (async () => {
+      const ok = await bridge.configureApi({
+        origin: API_ORIGIN,
+        messagesBase: MESSAGES_BASE,
+        modelsUrl: MODELS_URL,
+        model: API_MODEL,
+        features: FEATURES,
+        verifyMode: VERIFY_MODE,
+      })
+      if (!ok) {
+        throw new ApiError('network', '主进程拒绝了 API 代理配置')
+      }
+      return bridge
+    })()
+  }
+  return desktopConfigured
+}
+
+const createRequestId = () =>
+  typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+    ? crypto.randomUUID()
+    : `req-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
+
+const abortReason = (signal: AbortSignal): unknown =>
+  signal.reason ?? new DOMException('Aborted', 'AbortError')
+
+export const isDesktopApiBridge = () => desktopBridge() !== undefined
+
+/** 一次性 API 请求；Key 不出主进程，signal 中止会转发到主进程 */
+const callDesktopApi = async <T>(
+  method: 'verify' | 'upload-file' | 'delete-file' | 'transcribe',
+  payload: unknown,
+  signal?: AbortSignal
+): Promise<T> => {
+  const bridge = await requireDesktopBridge()
+  if (signal?.aborted) {
+    throw abortReason(signal)
+  }
+  const id = createRequestId()
+  const onAbort = () => {
+    void bridge.abortApiRequest(id)
+  }
+  signal?.addEventListener('abort', onAbort, { once: true })
+  try {
+    const result = await bridge.apiRequest<T>(id, method, payload)
+    if (signal?.aborted) {
+      throw abortReason(signal)
+    }
+    if (!result.ok) {
+      throw apiErrorFromBridge(result.error)
+    }
+    return result.value
+  } catch (error) {
+    if (signal?.aborted) {
+      throw abortReason(signal)
+    }
+    if (error instanceof ApiError) {
+      throw error
+    }
+    throw new ApiError('network', error instanceof Error ? error.message : String(error))
+  } finally {
+    signal?.removeEventListener('abort', onAbort)
+  }
+}
+
+/**
+ * 把主进程转发的字节流包装成 ReadableStream：订阅先于启动，避免漏掉首帧；
+ * 中止或取消时通知主进程 abort 上游请求。
+ */
+const openDesktopByteStream = (
+  bridge: DesktopBridge,
+  id: string,
+  kind: 'message' | 'tts',
+  payload: unknown,
+  signal?: AbortSignal
+): ReadableStream<Uint8Array> => {
+  let cleanup = () => {}
+  return new ReadableStream<Uint8Array>({
+    start(controller) {
+      let settled = false
+      let unsubscribe = () => {}
+      const finish = () => {
+        if (settled) {
+          return
+        }
+        settled = true
+        cleanup()
+        try {
+          controller.close()
+        } catch {
+          // 已关闭
+        }
+      }
+      const fail = (error: unknown) => {
+        if (settled) {
+          return
+        }
+        settled = true
+        cleanup()
+        try {
+          controller.error(error)
+        } catch {
+          // 已关闭
+        }
+      }
+      const onAbort = () => {
+        void bridge.abortApiStream(id)
+        fail(abortReason(signal as AbortSignal))
+      }
+      cleanup = () => {
+        unsubscribe()
+        signal?.removeEventListener('abort', onAbort)
+        cleanup = () => {}
+      }
+
+      if (signal?.aborted) {
+        fail(abortReason(signal))
+        return
+      }
+
+      unsubscribe = bridge.onApiStream((event) => {
+        if (event.id !== id) {
+          return
+        }
+        if (event.type === 'chunk') {
+          if (settled || !event.data) {
+            return
+          }
+          try {
+            controller.enqueue(new Uint8Array(event.data))
+          } catch {
+            // 流已关闭时停止入队
+          }
+          return
+        }
+        if (event.type === 'end') {
+          finish()
+          return
+        }
+        if (event.type === 'error') {
+          fail(apiErrorFromBridge(event.error))
+        }
+      })
+      signal?.addEventListener('abort', onAbort, { once: true })
+
+      void bridge
+        .startApiStream(id, kind, payload)
+        .then((result) => {
+          if (!result.ok) {
+            fail(apiErrorFromBridge(result.error))
+          }
+        })
+        .catch((error: unknown) => {
+          fail(error instanceof ApiError ? error : new ApiError('network', String(error)))
+        })
+    },
+    cancel() {
+      void bridge.abortApiStream(id)
+      cleanup()
+    },
+  })
+}
+
+/** 在输入/校验 Key 前先把构建期 provider 同步给主进程 */
+export const prepareDesktopApi = async (): Promise<boolean> => {
+  if (!desktopBridge()) {
+    return false
+  }
+  await requireDesktopBridge()
+  return true
+}
+
+/** 桌面端一次性请求；speech.ts 复用同一套 IPC 中止语义 */
+export const desktopApiRequest = callDesktopApi
+
+/** 桌面端流式请求；返回主进程字节流的 ReadableStream */
+export const openDesktopApiStream = async (
+  kind: 'message' | 'tts',
+  payload: unknown,
+  signal?: AbortSignal
+): Promise<ReadableStream<Uint8Array>> => {
+  const bridge = await requireDesktopBridge()
+  return openDesktopByteStream(bridge, createRequestId(), kind, payload, signal)
+}
+
 /**
  * 校验 API Key。默认仍用 GET /models（不产生费用）；
  * 测试 provider 可改为 1-token POST 或跳过，并区分不可达 / 401 / 模型不存在。
+ * 桌面端校验主进程当前持有的 Key；输入新 Key 时走 verifyAndSaveApiKey。
  */
 export const verifyApiKey = async (apiKey: string, signal?: AbortSignal): Promise<void> => {
   if (VERIFY_MODE === 'skip') {
+    return
+  }
+  if (desktopBridge()) {
+    await callDesktopApi('verify', null, signal)
     return
   }
   if (VERIFY_MODE === 'message') {
@@ -118,8 +355,8 @@ export const verifyApiKey = async (apiKey: string, signal?: AbortSignal): Promis
       if (
         error instanceof ApiError &&
         (error.status === 404 ||
-          /model/i.test(error.message) &&
-            /(not found|not exist|unsupported|invalid|unknown)/i.test(error.message))
+          (/model/i.test(error.message) &&
+            /(not found|not exist|unsupported|invalid|unknown)/i.test(error.message)))
       ) {
         throw new ApiError('http', { key: 'apiKeyModelUnavailable' }, error.status)
       }
@@ -134,24 +371,56 @@ export const verifyApiKey = async (apiKey: string, signal?: AbortSignal): Promis
   })
 }
 
+/** 桌面端上传输入：ArrayBuffer + 文件名 + MIME，便于结构化克隆跨 IPC */
+export type UploadFileData = {
+  data: ArrayBuffer
+  name: string
+  mimeType?: string
+}
+
+export type UploadFileSource = File | ArrayBuffer | UploadFileData
+
 /**
  * POST /anthropic/v1/files 上传附件（不设过期时间，会话里的历史附件一直可用）。
  * purpose 为 null 时不传该字段（图片）；purpose 必须排在 file 之前。
+ * 桌面端接受 File、{ data, name, mimeType } 或裸 ArrayBuffer（配合 filename）。
  */
 export const uploadFile = async (
   apiKey: string,
-  file: File,
+  file: UploadFileSource,
   purpose: FilePurpose | null,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  filename?: string
 ): Promise<FileObject> => {
   if (!FEATURES.files) {
     throw new ApiError('http', { key: 'featureUnavailableFiles' })
   }
+  const source: UploadFileData =
+    file instanceof File
+      ? {
+          data: await file.arrayBuffer(),
+          name: file.name,
+          mimeType: file.type || undefined,
+        }
+      : file instanceof ArrayBuffer
+        ? { data: file, name: filename?.trim() || 'file.bin' }
+        : file
+  if (desktopBridge()) {
+    return callDesktopApi<FileObject>(
+      'upload-file',
+      { ...source, purpose },
+      signal
+    )
+  }
+
   const form = new FormData()
   if (purpose) {
     form.append('purpose', purpose)
   }
-  form.append('file', file)
+  const body = new File([source.data], source.name, {
+    type: source.mimeType || 'application/octet-stream',
+  })
+  form.append('file', body)
   const response = await request(`${ANTHROPIC_BASE_URL}/files`, {
     method: 'POST',
     headers: anthropicHeaders(apiKey, true),
@@ -166,6 +435,10 @@ export const deleteFile = async (apiKey: string, fileId: string): Promise<void> 
   if (!FEATURES.files) {
     throw new ApiError('http', { key: 'featureUnavailableFiles' })
   }
+  if (desktopBridge()) {
+    await callDesktopApi('delete-file', { fileId })
+    return
+  }
   await request(`${ANTHROPIC_BASE_URL}/files/${encodeURIComponent(fileId)}`, {
     method: 'DELETE',
     headers: anthropicHeaders(apiKey, true),
@@ -179,30 +452,12 @@ const hasFile = (body: CreateMessageRequest) =>
       message.content.some((block) => block.type === 'image' || block.type === 'document')
   )
 
-/**
- * POST /anthropic/v1/messages（stream: true），逐个产出流式事件，收到 message_stop 时结束。
- * ping、保活注释与无法解析的内容不产出；中止请求时抛出 signal 的 AbortError。
- */
-export async function* streamMessage(
-  apiKey: string,
-  body: CreateMessageRequest,
+/** 解析 SSE 字节流；桌面端与网页端共用，保证流式语义一致 */
+async function* readMessageEvents(
+  stream: ReadableStream<Uint8Array>,
   signal: AbortSignal
 ): AsyncGenerator<MessageStreamEvent> {
-  const response = await request(`${ANTHROPIC_BASE_URL}/messages`, {
-    method: 'POST',
-    headers: {
-      ...anthropicHeaders(apiKey, hasFile(body)),
-      'Content-Type': 'application/json',
-      Accept: 'text/event-stream',
-    },
-    body: JSON.stringify({ ...body, stream: true }),
-    signal,
-  })
-  const contentType = response.headers.get('Content-Type') ?? ''
-  if (!response.body || !contentType.includes('text/event-stream')) {
-    throw await readErrorResponse(response, 'protocol', '')
-  }
-  for await (const { event: eventName, data } of readServerSentEvents(response.body, signal)) {
+  for await (const { event: eventName, data } of readServerSentEvents(stream, signal)) {
     let payload: unknown
     try {
       payload = JSON.parse(data)
@@ -228,4 +483,40 @@ export async function* streamMessage(
   }
   // 服务端没有提供错误内容时保持为空，不推测断流原因。
   throw new ApiError('interrupted', '')
+}
+
+/**
+ * POST /anthropic/v1/messages（stream: true），逐个产出流式事件，收到 message_stop 时结束。
+ * ping、保活注释与无法解析的内容不产出；中止请求时抛出 signal 的 AbortError。
+ * 桌面端由主进程转发 SSE 原始字节，渲染层不接触 Key，也不直连上游。
+ */
+export async function* streamMessage(
+  apiKey: string,
+  body: CreateMessageRequest,
+  signal: AbortSignal
+): AsyncGenerator<MessageStreamEvent> {
+  const bridge = desktopBridge()
+  if (bridge) {
+    const configured = await requireDesktopBridge()
+    const id = createRequestId()
+    const stream = openDesktopByteStream(configured, id, 'message', body, signal)
+    yield* readMessageEvents(stream, signal)
+    return
+  }
+
+  const response = await request(`${ANTHROPIC_BASE_URL}/messages`, {
+    method: 'POST',
+    headers: {
+      ...anthropicHeaders(apiKey, hasFile(body)),
+      'Content-Type': 'application/json',
+      Accept: 'text/event-stream',
+    },
+    body: JSON.stringify({ ...body, stream: true }),
+    signal,
+  })
+  const contentType = response.headers.get('Content-Type') ?? ''
+  if (!response.body || !contentType.includes('text/event-stream')) {
+    throw await readErrorResponse(response, 'protocol', '')
+  }
+  yield* readMessageEvents(response.body, signal)
 }

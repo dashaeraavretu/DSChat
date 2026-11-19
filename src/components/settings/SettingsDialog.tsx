@@ -161,7 +161,7 @@ const SettingsContent = () => {
           ) : (
             <>
               <ApiKeyField editor={apiKeyEditor} />
-              {apiKeyEditor.apiKey ? (
+              {apiKeyEditor.hasApiKey ? (
                 <SettingCell
                   label={t('apiKeyClear')}
                   status={null}
