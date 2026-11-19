@@ -61,6 +61,33 @@ DSChat v1 在桌面端复刻官方 demo 的功能：
 - Markdown、代码高亮、KaTeX 公式与 Mermaid 图表。
 - 简体中文与英文、浅色与深色主题（含跟随系统）、移动端布局、位置设置、历史导入导出。
 
+0.3.3 新增：
+
+- `dsc://app` 严格 CSP：禁止内联脚本，渲染层不能直连 API。
+- Messages、Files、ASR、TTS 与模型校验全部改由主进程代理发出。
+- API Key 只存在于主进程（`safeStorage` 或仅内存）；渲染层只能看到 `hasApiKey`。
+- 移除明文 `secrets.json` 降级与 `localStorage` Key 回退。
+
+0.3.2 新增：
+
+- 选中消息文本后引用回复。
+- 会话/消息导出为图片，保证 KaTeX/Mermaid 渲染正确。
+- 可选完成提示音。
+- HTTP / SOCKS5 代理设置（跟随系统 / 手动）。
+
+0.3.1 新增：
+
+- 预设变量（`{{user}}`、`{{char}}`、`{{date}}`、`{{time}}`、`{{original}}`）。
+- 空/错/加载状态使用开源装饰，并补第三方许可声明。
+- 会话级输入历史（↑/↓）与可选字数统计。
+
+0.3.0 新增：
+
+- 设置第三组「预设」：新建/编辑、默认标记、会话快照与每轮 system 注入；空会话显示预设开场白。
+- 支持酒馆角色卡 V2/V3 的 `.json` / `.png`（tEXt/iTXt `chara`/`ccv3`）导入为预设；不含世界书、群聊、STscript。
+- 临时会话（仅内存）、会话置顶、舒适/宽阅读宽度、朗读语速 0.8/1.0/1.2、Enter / Ctrl+Enter 发送偏好。
+- 行间公式 hover 复制按钮；CJK 粗体 Markdown 回归覆盖。
+
 0.2.1 新增：
 
 - 会话菜单按当前分支导出 Markdown。
@@ -83,7 +110,7 @@ DSChat v1 在桌面端复刻官方 demo 的功能：
 
 ## 数据与安全
 
-- **桌面端 API Key：** 经 Electron `safeStorage`（Windows DPAPI）加密后写入 `userData` 目录下的 `secrets.json`。若系统加密不可用，应用会在该文件中写入明确标注的明文降级数据，设置页显示“未加密/降级”；若 IPC 保存失败，渲染层回退到 `localStorage`（重启后仍加载），同样显示降级状态。设置页还提供带确认的「清除 API Key」。
+- **桌面端 API Key：** 只由主进程持有，经 Electron `safeStorage`（Windows DPAPI）加密后写入 `userData` 目录下的 `secrets.json`。若系统加密不可用，Key 仅在本次运行的主进程内存中保留，设置页显示未加密/降级；不会写明文文件，也不会回退到 `localStorage`。渲染层只能看到布尔值 `hasApiKey`，所有需要鉴权的请求都由主进程发出。设置页还提供带确认的「清除 API Key」。
 - **网页版 API Key 与设置：** 保存在浏览器 `localStorage`（`chat-demo:api-key` 等键）。网页版请只在可信的浏览器配置中使用。
 - **会话与附件原件：** 保存在本机 IndexedDB。
 - **历史导入导出：** ZIP 归档，包含会话与本地可用的图片原件；导出不包含 API Key、设置和非图片附件原件。
@@ -104,7 +131,7 @@ DSCHAT_API_ORIGIN=https://api.example.com pnpm build
 $env:DSCHAT_API_ORIGIN = "https://api.example.com"; pnpm build
 ```
 
-目标端点需实现 Anthropic 兼容的 Messages / Files API，以及 demo 使用的扩展能力（搜索、链接阅读、标题、`latest_reminder`、ASR/TTS）。细节与安全注意事项见 [docs/SELF-HOST.md](docs/SELF-HOST.md)。
+目标端点需实现 Anthropic 兼容的 Messages / Files API，以及 demo 使用的扩展能力（搜索、链接阅读、标题、`latest_reminder`、ASR/TTS）。构建会把解析后的 provider（origin、端点路径、模型、功能开关）写入 `electron/provider-config.json`；主进程把它同时用作默认 provider 和代理白名单，因此自建安装包在用户机器上不依赖运行时环境变量。桌面端请求全部由主进程代理发出，不需要目标服务配置 CORS。细节与安全注意事项见 [docs/SELF-HOST.md](docs/SELF-HOST.md)。
 
 ## 开发
 
@@ -121,6 +148,8 @@ $env:DSCHAT_API_ORIGIN = "https://api.example.com"; pnpm build
 | `pnpm dist:test`        | 打包千机测试包到 `release-test/`       |
 | `pnpm type`             | TypeScript 类型检查                    |
 | `pnpm lint`             | oxlint 检查                            |
+| `pnpm test`             | 运行全部无头回归测试                   |
+| `pnpm test:proxy`       | 对本机 mock 上游验证主进程 API 代理     |
 | `pnpm format`           | oxfmt 格式化                           |
 | `node tests/smoke.mjs`  | 零依赖的构建后冒烟测试                 |
 

@@ -1,5 +1,9 @@
 import { memo, useEffect, useMemo, useRef, useState } from 'react'
+import { useTranslate } from '../../i18n/index.js'
 import { ensureKatex, type Katex } from '../../services/markdown/katex.js'
+import { IconCopyOutline16 } from '../base/icons.js'
+import { showToast } from '../base/toastState.js'
+import { copyText } from '../../utils/clipboard.js'
 
 /** renderToString 外层包裹的标签，组件自己渲染外层，这里切掉 */
 const KATEX_WRAPPER = {
@@ -47,13 +51,34 @@ const useMathHtml = (input: string, isInline: boolean): MathHtmlResult => {
 }
 
 export const MathBlock = memo(function MathBlock({ value }: { value: string }) {
+  const t = useTranslate()
   const { html, renderMode } = useMathHtml(value, false)
   if (renderMode === 'fallback') {
     return <p className="ds-markdown-paragraph">{html}</p>
   }
+  const copy = async () => {
+    // copyText 内部处理 clipboard 不可用与权限失败，并回退到 execCommand。
+    const copied = await copyText(value)
+    showToast({ key: copied ? 'formulaCopied' : 'copyFailed' })
+  }
   return (
-    <span className="katex-display ds-markdown-math">
-      <span className="katex" dangerouslySetInnerHTML={{ __html: html }}></span>
+    <span className="ds-markdown-math-wrap">
+      <span className="katex-display ds-markdown-math">
+        <span className="katex" dangerouslySetInnerHTML={{ __html: html }}></span>
+      </span>
+      <button
+        type="button"
+        className="ds-math-copy"
+        aria-label={t('copyFormula')}
+        title={t('copyFormula')}
+        onClick={(event) => {
+          // 复制按钮不参与消息/公式所在区域的其他点击行为。
+          event.stopPropagation()
+          void copy()
+        }}
+      >
+        <IconCopyOutline16 />
+      </button>
     </span>
   )
 })

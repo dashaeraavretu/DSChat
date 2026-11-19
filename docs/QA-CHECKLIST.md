@@ -27,7 +27,7 @@
 - [ ] `pnpm dist:win` 生成安装包；安装、启动、卸载流程正常
 - [ ] 开发工具在生产包中不可用（`DevTools` 菜单/快捷键不出现）
 - [ ] 关闭再启动，单实例锁生效（第二次启动聚焦已有窗口，而不是新开窗口）
-- [ ] 打包版能从 `dsc://app` 成功请求 API（验证服务端 CORS；失败时记录为发布阻塞项）
+- [ ] 打包版能从 `dsc://app` 启动，主进程代理能连通 API（桌面端不依赖服务端 CORS）
 
 ## 2. API Key 与设置
 
@@ -37,7 +37,9 @@
 - [ ] 重启应用后 Key 仍有效（无需重新输入）
 - [ ] `%APPDATA%\DSChat\secrets.json` 存在，`encrypted` 为 `true`，文件中看不到明文 Key
 - [ ] 设置中更换 Key 后，新 Key 立即生效
-- [ ] 通过桌面桥接调用 `setApiKey(null)` 后文件被删除，应用回到未配置状态（当前设置界面无清除按钮，属已知缺口）
+- [ ] 设置页「清除 API Key」确认后文件被删除，应用回到未配置状态
+- [ ] 渲染进程无法读取明文 Key（`window.desktop.apiKey` 不存在），桌面端 `localStorage` 中没有 Key
+- [ ] `safeStorage` 不可用时 Key 仅在主进程内存，设置页显示“未加密/降级”，重启后需重输
 - [ ] 删除 `secrets.json` 后重启，应用按未配置处理并提示输入 Key
 - [ ] 网页版遗留 Key 迁移：在桌面版首次启动前向 `localStorage` 写入 `chat-demo:api-key`，启动后该键被清除且 Key 可用（仅开发验证）
 - [ ] 设置修改语言、主题、朗读音色、位置、思考/搜索开关后重启仍保留
@@ -162,6 +164,8 @@
 - [ ] 安装包与 `dist/` 中不存在 API Key、`secrets.json`、`.env`
 - [ ] `dist/LICENSE` 存在，安装包包含 MIT 许可证与上游署名
 - [ ] 渲染进程无法访问 Node.js（`window.require`、`process` 不可用）
+- [ ] HTML 响应包含严格 CSP；内联脚本不执行，渲染层不能直连 API
+- [ ] 主进程代理只接受构建期 provider 白名单；自建 origin 构建后无需运行时环境变量即可工作
 - [ ] 外部链接只通过系统浏览器打开；`javascript:`、`file:` 等协议被拒绝
 - [ ] 应用内不加载 `<webview>`
 - [ ] 生产包无法打开 DevTools
@@ -175,7 +179,6 @@
 以下项目在 v1 中已知存在，验收时确认影响范围并记入发布说明，而不是误判为回归：
 
 - [ ] 附件预览子窗口与主窗口同源，可读取父级 localStorage；隔离 defer 到 v1.1
-- [ ] `dsc://app` 的 CORS 依赖目标服务；未实现主进程代理
 - [ ] 扩展模式可能拒绝非图片 `document` 块（PDF/Office/文本附件需实测）
 - [ ] 移动布局在最小窗口宽度 900 px 下不可达
 - [ ] 删除会话/附件不删除远端 Files API 文件

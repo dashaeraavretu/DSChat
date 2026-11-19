@@ -523,3 +523,13 @@ export const IconToastError16 = () => (
     />
   </svg>
 )
+
+export const IconPinOutline16 = () => (
+  <svg width={16} height={16} viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path
+      d="M9.7 1.4 14.6 6.3 12.4 7 10 9.4 10.3 12.6 9 11.3 9.7 10.6 9.4 8 11.8 5.6 12.5 3.4 9.7 1.4Z"
+      fill="currentColor"
+    />
+    <path d="M7.6 9.2 2.2 14.6" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+  </svg>
+)

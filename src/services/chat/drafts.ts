@@ -10,6 +10,7 @@ import {
   validateFiles,
   type UploadTask,
 } from '../attachments.js'
+import type { Quote } from '../quote.js'
 import type { FileAttachment } from './types.js'
 
 export type DraftAttachment = {
@@ -20,9 +21,9 @@ export type DraftAttachment = {
   previewUrl: string | null
 }
 
-type Draft = { text: string; attachments: DraftAttachment[] }
+type Draft = { text: string; attachments: DraftAttachment[]; quote: Quote | null }
 
-export const EMPTY_DRAFT: Draft = { text: '', attachments: [] }
+export const EMPTY_DRAFT: Draft = { text: '', attachments: [], quote: null }
 
 /** 草稿只保存在本次页面的内存中，独立于会话详情缓存；null 是新对话的草稿。 */
 export const useDrafts = create<{ drafts: Map<string | null, Draft> }>(() => ({
@@ -36,7 +37,7 @@ const updateDraft = (sessionId: string | null, update: (draft: Draft) => Draft) 
   useDrafts.setState((state) => {
     const draft = update(state.drafts.get(sessionId) ?? EMPTY_DRAFT)
     const drafts = new Map(state.drafts)
-    if (draft.text || draft.attachments.length > 0) {
+    if (draft.text || draft.attachments.length > 0 || draft.quote) {
       drafts.set(sessionId, draft)
     } else {
       drafts.delete(sessionId)
@@ -46,6 +47,10 @@ const updateDraft = (sessionId: string | null, update: (draft: Draft) => Draft) 
 
 export const setDraftText = (sessionId: string | null, text: string) =>
   updateDraft(sessionId, (draft) => ({ ...draft, text }))
+
+/** 设置或取消（null）引用；引用只属于草稿，不进入消息树。 */
+export const setDraftQuote = (sessionId: string | null, quote: Quote | null) =>
+  updateDraft(sessionId, (draft) => ({ ...draft, quote }))
 
 const upload = (attachment: DraftAttachment, apiKey: string) => {
   // 上传任务负责记录错误，输入框的附件卡片展示失败及重试入口。
@@ -99,7 +104,10 @@ export const retryDraftAttachment = (
   }
 }
 
-/** 发送按钮和实际提交共用规则：有内容，且全部附件已上传成功。 */
+/**
+ * 发送按钮和实际提交共用规则：有内容，且全部附件已上传成功。
+ * 引用随本次提交返回，但不计入「有内容」：只有引用、没有文字和附件时不能发送。
+ */
 export const prepareDraftMessage = (draft: Draft, tasks: Record<string, UploadTask>) => {
   const text = draft.text.trim()
   if (!text && draft.attachments.length === 0) {
@@ -121,7 +129,7 @@ export const prepareDraftMessage = (draft: Draft, tasks: Record<string, UploadTa
       blob: attachment.file,
     })
   }
-  return { text, files }
+  return { text, files, quote: draft.quote }
 }
 
 const releaseAttachment = (attachment: DraftAttachment, cancel: boolean) => {

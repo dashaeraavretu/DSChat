@@ -46,6 +46,26 @@ declare const styles: {
   readonly "aboutValue": string;
   readonly "aboutWarning": string;
   readonly "aboutDescription": string;
+  readonly "presets": string;
+  readonly "presetToolbar": string;
+  readonly "presetList": string;
+  readonly "presetRow": string;
+  readonly "presetInfo": string;
+  readonly "presetName": string;
+  readonly "presetBadge": string;
+  readonly "presetMeta": string;
+  readonly "presetActions": string;
+  readonly "presetEmpty": string;
+  readonly "presetForm": string;
+  readonly "presetField": string;
+  readonly "presetFieldLabel": string;
+  readonly "presetInput": string;
+  readonly "presetTextarea": string;
+  readonly "presetVariables": string;
+  readonly "presetPreview": string;
+  readonly "presetEditor": string;
+  readonly "presetEditorMain": string;
+  readonly "proxyFields": string;
 };
 export = styles;
 

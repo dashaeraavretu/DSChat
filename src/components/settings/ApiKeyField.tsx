@@ -10,10 +10,10 @@ import styles from './Settings.module.css'
 
 /** API Key 的编辑状态：输入框与移动端底部的「确定」按钮共用 */
 export const useApiKeyEditor = () => {
-  const apiKey = useSettings((state) => state.apiKey)
+  const hasApiKey = useSettings((state) => state.hasApiKey)
   const [editing, setEditing] = useState(false)
   const form = useApiKeyForm(() => setEditing(false))
-  return { apiKey, editing, setEditing, form, showInput: !apiKey || editing }
+  return { hasApiKey, editing, setEditing, form, showInput: !hasApiKey || editing }
 }
 
 type ApiKeyEditor = ReturnType<typeof useApiKeyEditor>
@@ -22,17 +22,16 @@ type ApiKeyEditor = ReturnType<typeof useApiKeyEditor>
 export const ApiKeyField = ({ editor }: { editor: ApiKeyEditor }) => {
   const t = useTranslate()
   const isMobile = useIsMobile()
-  const { apiKey, editing, setEditing, form, showInput } = editor
+  const { hasApiKey, editing, setEditing, form, showInput } = editor
   const desktop = isDesktopApp()
   const apiKeyStorage = useSettings((state) => state.apiKeyStorage)
-  const degraded = desktop && apiKeyStorage !== 'encrypted'
+  // 只有主进程确实持有 Key 且未加密时才提示降级
+  const degraded = desktop && hasApiKey && apiKeyStorage !== 'encrypted'
   const storageHint = !desktop
     ? 'apiKeyWebStorageHint'
     : apiKeyStorage === 'encrypted'
       ? 'apiKeyDesktopStorageHint'
-      : apiKeyStorage === 'localStorage'
-        ? 'apiKeyDesktopFallbackHint'
-        : 'apiKeyDesktopPlaintextHint'
+      : 'apiKeyDesktopPlaintextHint'
 
   return (
     <div className={styles.cell}>
@@ -41,9 +40,10 @@ export const ApiKeyField = ({ editor }: { editor: ApiKeyEditor }) => {
         <div className={clsx(styles.description, degraded && styles.error)}>
           {degraded ? `⚠ ${t(storageHint)}` : t(storageHint)}
         </div>
-        {apiKey && !editing ? (
+        {hasApiKey && !editing ? (
           <div className={styles.apiKeySaved}>
-            <span className={styles.apiKeyMask}>{'*'.repeat(apiKey.length)}</span>
+            {/* 固定掩码：不根据 Key 长度泄露任何信息 */}
+            <span className={styles.apiKeyMask}>********</span>
             <IconButton
               tone="primary"
               icon={<IconEditOutline16 />}
@@ -69,7 +69,7 @@ export const ApiKeyField = ({ editor }: { editor: ApiKeyEditor }) => {
               }}
               onBlur={() => {
                 // 修改时没输入就离开，回到已保存的状态
-                if (apiKey && !form.value.trim()) {
+                if (hasApiKey && !form.value.trim()) {
                   setEditing(false)
                 }
               }}

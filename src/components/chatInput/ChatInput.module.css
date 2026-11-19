@@ -8,7 +8,7 @@
   cursor: text;
   font-size: 16px;
   line-height: var(--line-height);
-  border-radius: 24px;
+  border-radius: var(--ds-radius-24);
   border: 1px solid var(--dsw-alias-border-l2-darkmode-thin);
   background: var(--dsw-specific-input-major);
   overflow: hidden;
@@ -46,7 +46,7 @@
   box-sizing: border-box;
   width: 64px;
   height: 64px;
-  border-radius: 16px;
+  border-radius: var(--ds-radius-16);
   border: 1px solid var(--dsw-alias-border-l2);
   overflow: hidden;
   background-color: var(--dsw-alias-bg-skeleton);
@@ -63,6 +63,73 @@
   }
 }
 
+/* 引用块：固定在输入框顶部，自身限高滚动，不挤压正文输入区 */
+.quote {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  gap: 2px;
+  min-width: 0;
+  box-sizing: border-box;
+  margin: 12px 12px 0;
+  padding: 8px 10px;
+  border-left: 3px solid var(--dsw-alias-brand-text);
+  border-radius: var(--ds-radius-8);
+  background-color: var(--dsw-alias-bg-layer-3);
+  cursor: default;
+}
+
+.quoteHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+
+.quoteLabel {
+  overflow: hidden;
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 500;
+  color: var(--dsw-alias-label-tertiary);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.quoteRemove {
+  flex-shrink: 0;
+  margin: -4px -6px -4px 0;
+}
+
+.quoteText {
+  max-height: 96px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--dsw-alias-label-secondary);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* 窄窗口下进一步限制预览高度，保证输入区高度不被引用块挤压 */
+@media (max-width: 900px) {
+  .quoteText {
+    max-height: 60px;
+  }
+}
+
+@media not all and (min-width: 700px) {
+  .quote {
+    margin-top: 8px;
+  }
+
+  .quoteText {
+    max-height: 40px;
+  }
+}
+
 .uploading {
   position: absolute;
   inset: 0;
@@ -76,7 +143,7 @@
     width: 16px;
     height: 16px;
     margin: -10px 0 0 -10px;
-    border-radius: 50%;
+    border-radius:50%;
     border: 2px solid rgba(255, 255, 255, 0.4);
     border-top-color: #fff;
     animation: spin 0.8s linear infinite;
@@ -147,7 +214,7 @@
   height: 18px;
   padding: 0;
   border: none;
-  border-radius: 50%;
+  border-radius:50%;
   color: var(--dsw-alias-label-primary-inverted);
   background-color: var(--dsw-alias-button-contrast-fill);
   filter: drop-shadow(0 0 0.5px rgba(0, 0, 0, 0.2));
@@ -263,7 +330,7 @@
   gap: 4px;
   height: 34px;
   padding: 0 12px;
-  border-radius: 18px;
+  border-radius: var(--ds-radius-18);
   border: 1px solid var(--dsw-alias-border-l2);
   background-color: transparent;
   color: var(--dsw-alias-label-primary);
@@ -315,7 +382,7 @@
   margin-left: 6px;
   padding: 0;
   border: none;
-  border-radius: 50%;
+  border-radius:50%;
   background: var(--dsw-alias-button-primary-fill);
   color: var(--dsw-static-neutral-bluish-00);
   cursor: pointer;
@@ -329,4 +396,12 @@
     opacity: 0.4;
     cursor: not-allowed;
   }
+}
+
+.count {
+  margin-right: 6px;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 11px;
+  line-height: 20px;
+  white-space: nowrap;
 }

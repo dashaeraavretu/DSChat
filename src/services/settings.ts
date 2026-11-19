@@ -10,22 +10,34 @@ export type ThemePreference = 'light' | 'dark' | 'system'
 /**
  * API Key 的实际保存方式：
  * - encrypted：主进程确认使用系统加密
- * - plaintext：主进程确认系统加密不可用或存档为明文（降级）
- * - localStorage：主进程保存失败，渲染层回退到浏览器本地存储（未加密，降级）
+ * - memory：safeStorage 不可用，只在主进程内存中保存（未加密、不落盘，降级）
  * - web：纯网页版
+ * 桌面端不再回退到 localStorage。
  */
-export type ApiKeyStorage = 'encrypted' | 'plaintext' | 'localStorage' | 'web'
+export type ApiKeyStorage = 'encrypted' | 'memory' | 'web'
 
 /** 可用缩放档位；与设置下拉一致 */
 export type ZoomFactor = 0.9 | 1 | 1.1 | 1.25
 const ZOOM_FACTORS: ZoomFactor[] = [0.9, 1, 1.1, 1.25]
+export type ReadingWidth = 'comfortable' | 'wide'
+export type TtsSpeed = 0.8 | 1 | 1.2
+export type SendKey = 'enter' | 'ctrlEnter'
+export type Appearance = 'original' | 'tui' | 'fish' | 'paper'
+export type ProxyMode = 'system' | 'http' | 'socks5'
 
 /**
  * 本机设置，存 localStorage：语言、主题、位置、朗读音色、深度思考与智能搜索开关、侧边栏收起状态。
- * API Key 在桌面端由系统加密存储（见 window.desktop），网页端仍存 localStorage。
+ * API Key 在桌面端由主进程持有（见 window.desktop），渲染层只有 hasApiKey；
+ * 网页端仍存 localStorage。
  */
 type Settings = {
+  /**
+   * 桌面端仅用作「已有 Key」的兼容标记，绝不是真实 Key；
+   * 真实 Key 只在主进程内存/系统加密存档中。网页端仍保存真实 Key。
+   */
   apiKey: string | null
+  /** 主进程是否持有 API Key（桌面端唯一的 Key 状态来源） */
+  hasApiKey: boolean
   apiKeyStorage: ApiKeyStorage
   locale: Locale
   themePreference: ThemePreference
@@ -40,6 +52,16 @@ type Settings = {
   notifyOnComplete: boolean
   /** 主窗口界面缩放 */
   zoomFactor: ZoomFactor
+  readingWidth: ReadingWidth
+  ttsSpeed: TtsSpeed
+  sendKey: SendKey
+  appearance: Appearance
+  showMascot: boolean
+  showInputCount: boolean
+  notifySound: boolean
+  proxyMode: ProxyMode
+  proxyHost: string
+  proxyPort: string
 }
 
 const KEYS = {
@@ -53,6 +75,16 @@ const KEYS = {
   siderCollapsed: 'chat-demo:sider-collapsed',
   notifyOnComplete: 'chat-demo:notify-on-complete',
   zoomFactor: 'chat-demo:zoom-factor',
+  readingWidth: 'chat-demo:reading-width',
+  ttsSpeed: 'chat-demo:tts-speed',
+  sendKey: 'chat-demo:send-key',
+  appearance: 'chat-demo:appearance',
+  showMascot: 'chat-demo:show-mascot',
+  showInputCount: 'chat-demo:show-input-count',
+  notifySound: 'chat-demo:notify-sound',
+  proxyMode: 'chat-demo:proxy-mode',
+  proxyHost: 'chat-demo:proxy-host',
+  proxyPort: 'chat-demo:proxy-port',
 } as const
 
 /** Electron preload 注入的桌面桥接；纯网页环境返回 undefined */
@@ -66,6 +98,13 @@ const desktopBridge = (): DesktopBridge | undefined => {
 
 /** 是否运行在桌面端（Electron 壳）内；网页端为 false */
 export const isDesktopApp = (): boolean => desktopBridge() !== undefined
+
+/**
+ * preload 异常时 window.desktop 不存在，但仍是 Electron。此时绝不能把
+ * Key 当网页版写进 localStorage；宁可提示不可用，也不降级成明文。
+ */
+const isElectronRuntime = (): boolean =>
+  typeof navigator !== 'undefined' && /\bElectron\//i.test(navigator.userAgent)
 
 const read = (key: string) => {
   try {
@@ -124,12 +163,20 @@ const initialThemePreference = (): ThemePreference => {
 /** 未保存过时使用服务端默认音色 stella（海星） */
 const initialTtsVoice = (): TtsVoice => (read(KEYS.ttsVoice) === 'tide' ? 'tide' : 'stella')
 
-/** 桌面端使用 preload 解密后的 Key；网页端沿用 localStorage */
+/**
+ * 桌面端兼容标记：只表示「主进程已有 Key」，不携带任何密钥字符。
+ * 其他模块仍按 `apiKey` 真假判断，因此保留该字段而不把真实 Key 放进渲染层。
+ */
+const DESKTOP_KEY_PRESENT = '__desktop_key_present__'
+
+/** 桌面端只检查主进程 hasApiKey；网页端沿用 localStorage */
 const initialApiKey = (): string | null => {
   const bridge = desktopBridge()
   if (bridge) {
-    // 主进程不可用时的 localStorage 降级键仍可用于本次会话，避免每次重启都丢失
-    return typeof bridge.apiKey === 'string' ? bridge.apiKey : read(KEYS.apiKey)
+    return bridge.hasApiKey === true ? DESKTOP_KEY_PRESENT : null
+  }
+  if (isElectronRuntime()) {
+    return null
   }
   return read(KEYS.apiKey)
 }
@@ -145,15 +192,14 @@ const initialApiKeyStorage = (): ApiKeyStorage => {
   if (!bridge) {
     return 'web'
   }
-  // localStorage 里还留着降级键时，必须先如实显示“未加密”，不能等迁移后才纠正
-  if (!bridge.apiKey && read(KEYS.apiKey)) {
-    return 'localStorage'
-  }
-  return bridge.keyStorage?.mode === 'encrypted' ? 'encrypted' : 'plaintext'
+  return bridge.keyStorage?.mode === 'encrypted' ? 'encrypted' : 'memory'
 }
 
 export const useSettings = create<Settings>(() => ({
   apiKey: initialApiKey(),
+  hasApiKey:
+    desktopBridge()?.hasApiKey === true ||
+    (!desktopBridge() && !isElectronRuntime() && !!read(KEYS.apiKey)),
   apiKeyStorage: initialApiKeyStorage(),
   locale: initialLocale(),
   location: initialLocation(),
@@ -165,6 +211,22 @@ export const useSettings = create<Settings>(() => ({
   closeToTray: desktopBridge()?.desktopPrefs?.closeToTray === true,
   notifyOnComplete: read(KEYS.notifyOnComplete) !== 'false',
   zoomFactor: initialZoomFactor(),
+  readingWidth: read(KEYS.readingWidth) === 'wide' ? 'wide' : 'comfortable',
+  ttsSpeed: read(KEYS.ttsSpeed) === '0.8' ? 0.8 : read(KEYS.ttsSpeed) === '1.2' ? 1.2 : 1,
+  sendKey: read(KEYS.sendKey) === 'ctrlEnter' ? 'ctrlEnter' : 'enter',
+  appearance: (() => {
+    const value = read(KEYS.appearance)
+    return value === 'tui' || value === 'fish' || value === 'paper' ? value : 'original'
+  })(),
+  showMascot: read(KEYS.showMascot) !== 'false',
+  showInputCount: read(KEYS.showInputCount) !== 'false',
+  notifySound: read(KEYS.notifySound) !== 'false',
+  proxyMode: (() => {
+    const value = read(KEYS.proxyMode)
+    return value === 'http' || value === 'socks5' ? value : 'system'
+  })(),
+  proxyHost: read(KEYS.proxyHost) ?? '',
+  proxyPort: read(KEYS.proxyPort) ?? '',
 }))
 
 export const setLocale = (locale: Locale) => {
@@ -191,15 +253,7 @@ export const setTtsVoice = (ttsVoice: TtsVoice) => {
 const setApiKeyStorage = (apiKeyStorage: ApiKeyStorage) =>
   useSettings.setState({ apiKeyStorage })
 
-/** 主进程保存失败时的降级路径：写入 localStorage，并在设置页如实标记未加密 */
-const fallbackToLocalStorage = (apiKey: string | null, reason: unknown) => {
-  // eslint-disable-next-line no-console
-  console.warn('[settings] 系统加密存储不可用，API Key 已回退保存到 localStorage（未加密）', reason)
-  write(KEYS.apiKey, apiKey)
-  setApiKeyStorage('localStorage')
-}
-
-/** 重新向主进程查询实际存储方式；只在保存成功后调用，避免覆盖 localStorage 降级状态 */
+/** 重新向主进程查询实际存储方式；桌面端只接受 encrypted / memory */
 export const refreshApiKeyStorage = async (): Promise<void> => {
   const bridge = desktopBridge()
   if (!bridge || typeof bridge.getKeyStorage !== 'function') {
@@ -207,41 +261,86 @@ export const refreshApiKeyStorage = async (): Promise<void> => {
   }
   try {
     const status = await bridge.getKeyStorage()
-    setApiKeyStorage(status.mode === 'encrypted' ? 'encrypted' : 'plaintext')
+    setApiKeyStorage(status.mode === 'encrypted' ? 'encrypted' : 'memory')
+    if (typeof status.hasApiKey === 'boolean') {
+      useSettings.setState({
+        hasApiKey: status.hasApiKey,
+        apiKey: status.hasApiKey ? DESKTOP_KEY_PRESENT : null,
+      })
+    }
   } catch (error) {
     // eslint-disable-next-line no-console
-    console.warn('[settings] 查询密钥存储状态失败，按未加密展示', error)
-    setApiKeyStorage('plaintext')
+    console.warn('[settings] 查询密钥存储状态失败，按未加密内存模式展示', error)
+    setApiKeyStorage('memory')
   }
 }
 
 /**
- * 桌面端异步保存：主进程返回 false（无法持久化）或 IPC 异常时，
- * 回退 localStorage 并标记为未加密降级；成功则刷新主进程给出的状态。
+ * 桌面端异步保存：主进程负责 safeStorage 或内存降级，渲染层绝不写 localStorage。
+ * 失败时回滚 hasApiKey，避免界面显示与实际状态不一致。
  */
-const saveDesktopApiKey = async (bridge: DesktopBridge, apiKey: string | null) => {
+const saveDesktopApiKey = async (
+  bridge: DesktopBridge,
+  apiKey: string | null,
+  previousHasKey: boolean
+) => {
   try {
     const saved = await bridge.setApiKey(apiKey)
     if (!saved) {
-      fallbackToLocalStorage(apiKey, '主进程保存失败')
+      useSettings.setState({
+        apiKey: previousHasKey ? DESKTOP_KEY_PRESENT : null,
+        hasApiKey: previousHasKey,
+      })
       return
     }
     await refreshApiKeyStorage()
   } catch (error) {
-    fallbackToLocalStorage(apiKey, error)
+    // eslint-disable-next-line no-console
+    console.warn('[settings] 主进程保存 API Key 失败', error)
+    useSettings.setState({
+      apiKey: previousHasKey ? DESKTOP_KEY_PRESENT : null,
+      hasApiKey: previousHasKey,
+    })
   }
 }
 
-export const setApiKey = (apiKey: string | null) => {
+/**
+ * 更新 API Key 状态。桌面端只把 Key 交给主进程一次，渲染层保存的是
+ * DESKTOP_KEY_PRESENT 标记；网页端保持原有 localStorage 行为。
+ * `persisted` 用于「主进程已校验并保存」的场景，避免重复写盘。
+ */
+export const setApiKey = (
+  apiKey: string | null,
+  options?: { persisted?: boolean }
+) => {
   const bridge = desktopBridge()
   if (!bridge) {
+    if (isElectronRuntime()) {
+      // 预加载桥接失效时不做 localStorage 明文降级
+      // eslint-disable-next-line no-console
+      console.warn('[settings] 桌面桥接不可用，已拒绝把 API Key 写入 localStorage')
+      useSettings.setState({ apiKey: null, hasApiKey: false })
+      return
+    }
     write(KEYS.apiKey, apiKey)
+    useSettings.setState({
+      apiKey,
+      hasApiKey: !!apiKey,
+    })
+    return
   }
-  useSettings.setState({ apiKey })
-  if (bridge) {
-    // 桌面端不在这里写明文，等加密存储的结果
-    void saveDesktopApiKey(bridge, apiKey)
+
+  const previousHasKey = useSettings.getState().hasApiKey
+  const hasKey = !!apiKey
+  useSettings.setState({
+    apiKey: hasKey ? DESKTOP_KEY_PRESENT : null,
+    hasApiKey: hasKey,
+  })
+  if (options?.persisted) {
+    void refreshApiKeyStorage()
+    return
   }
+  void saveDesktopApiKey(bridge, apiKey, previousHasKey)
 }
 
 /**
@@ -262,7 +361,7 @@ export const clearApiKey = async (): Promise<boolean> => {
     }
   }
   write(KEYS.apiKey, null)
-  useSettings.setState({ apiKey: null })
+  useSettings.setState({ apiKey: null, hasApiKey: false })
   if (bridge) {
     await refreshApiKeyStorage()
   } else {
@@ -272,8 +371,9 @@ export const clearApiKey = async (): Promise<boolean> => {
 }
 
 /**
- * 桌面端：把网页版遗留在 localStorage 的 API Key 迁移到系统加密存储。
- * 成功后才删除旧键；迁移失败保留旧键并警告，不阻塞应用启动。
+ * 桌面端：把网页版遗留在 localStorage 的 API Key 交给主进程后删除旧键。
+ * 主进程按 safeStorage 能力加密落盘或仅内存保存；无论哪种方式都不再保留
+ * localStorage 明文副本。
  */
 export const migrateLegacyApiKey = async (): Promise<void> => {
   const bridge = desktopBridge()
@@ -289,24 +389,30 @@ export const migrateLegacyApiKey = async (): Promise<void> => {
   if (!legacy) {
     return
   }
+
+  // 主进程已有 Key 时只清掉遗留明文，不覆盖现有 Key
+  if (useSettings.getState().hasApiKey) {
+    write(KEYS.apiKey, null)
+    return
+  }
+
   try {
     const saved = await bridge.setApiKey(legacy)
     if (!saved) {
       // eslint-disable-next-line no-console
-      console.warn('[settings] 系统加密存储不可用，网页版遗留的 API Key 暂时保留在 localStorage')
-      setApiKeyStorage('localStorage')
+      console.warn('[settings] 主进程拒绝迁移旧版 API Key，保留 localStorage 旧键')
       return
     }
+    // 迁移成功后立即删除明文副本；主进程可能只是内存模式，界面会如实显示降级
     write(KEYS.apiKey, null)
-    // preload 启动时未拿到 Key（例如首次从网页版升级）时，补上内存状态
-    if (!useSettings.getState().apiKey) {
-      useSettings.setState({ apiKey: legacy })
-    }
+    useSettings.setState({
+      apiKey: DESKTOP_KEY_PRESENT,
+      hasApiKey: true,
+    })
     await refreshApiKeyStorage()
   } catch (error) {
     // eslint-disable-next-line no-console
     console.warn('[settings] 迁移网页版 API Key 失败，保留 localStorage 旧键', error)
-    setApiKeyStorage('localStorage')
   }
 }
 
@@ -323,6 +429,71 @@ export const setSearch = (search: boolean) => {
 export const setSiderCollapsed = (siderCollapsed: boolean) => {
   write(KEYS.siderCollapsed, String(siderCollapsed))
   useSettings.setState({ siderCollapsed })
+}
+
+export const setReadingWidth = (readingWidth: ReadingWidth) => {
+  write(KEYS.readingWidth, readingWidth)
+  useSettings.setState({ readingWidth })
+}
+
+export const setTtsSpeed = (ttsSpeed: TtsSpeed) => {
+  write(KEYS.ttsSpeed, String(ttsSpeed))
+  useSettings.setState({ ttsSpeed })
+}
+
+export const setSendKey = (sendKey: SendKey) => {
+  write(KEYS.sendKey, sendKey)
+  useSettings.setState({ sendKey })
+}
+
+export const setAppearance = (appearance: Appearance) => {
+  write(KEYS.appearance, appearance)
+  useSettings.setState({ appearance })
+}
+
+export const setShowMascot = (showMascot: boolean) => {
+  write(KEYS.showMascot, String(showMascot))
+  useSettings.setState({ showMascot })
+}
+
+export const setShowInputCount = (showInputCount: boolean) => {
+  write(KEYS.showInputCount, String(showInputCount))
+  useSettings.setState({ showInputCount })
+}
+
+export const setNotifySound = (notifySound: boolean) => {
+  write(KEYS.notifySound, String(notifySound))
+  useSettings.setState({ notifySound })
+}
+
+export const applyProxyPreference = (): void => {
+  const bridge = desktopBridge()
+  if (!bridge?.applyProxy) {
+    return
+  }
+  const { proxyMode, proxyHost, proxyPort } = useSettings.getState()
+  void bridge.applyProxy({
+    mode: proxyMode,
+    host: proxyHost,
+    port: proxyPort,
+  })
+}
+
+export const setProxyPreference = (patch: {
+  mode?: ProxyMode
+  host?: string
+  port?: string
+}) => {
+  const next = {
+    proxyMode: patch.mode ?? useSettings.getState().proxyMode,
+    proxyHost: patch.host ?? useSettings.getState().proxyHost,
+    proxyPort: patch.port ?? useSettings.getState().proxyPort,
+  }
+  write(KEYS.proxyMode, next.proxyMode)
+  write(KEYS.proxyHost, next.proxyHost)
+  write(KEYS.proxyPort, next.proxyPort)
+  useSettings.setState(next)
+  applyProxyPreference()
 }
 
 export const setNotifyOnComplete = (notifyOnComplete: boolean) => {

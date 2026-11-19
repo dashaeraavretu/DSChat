@@ -5,10 +5,16 @@ import {
   IconDownloadOutline16,
   IconEditOutline16,
   IconEllipsisOutline16,
+  IconPinOutline16,
   IconTrashOutline16,
 } from '../base/icons.js'
 import { exportSessionMarkdown } from '../../services/chat/exportMarkdown.js'
-import { renameSession, selectSession } from '../../services/chat/store.js'
+import { downloadSessionImage } from '../../services/chat/exportImage.js'
+import {
+  renameSession,
+  selectSession,
+  toggleSessionPin,
+} from '../../services/chat/store.js'
 import type { SessionSummary } from '../../services/chat/types.js'
 import { IconButton } from '../base/IconButton.js'
 import { Menu } from '../base/Menu.js'
@@ -75,32 +81,62 @@ export const SessionItem = memo(function SessionItem({
         }
       }}
     >
-      <div className={styles.title}>{displayTitle}</div>
+      <div className={styles.titleRow}>
+        {session.pinned ? (
+          <span className={styles.pin} aria-label={t('pinnedSession')}>
+            <IconPinOutline16 />
+          </span>
+        ) : null}
+        <div className={styles.title}>{displayTitle}</div>
+        {session.ephemeral ? <span className={styles.badge}>{t('ephemeralBadge')}</span> : null}
+      </div>
       <div className={styles.action} onClick={(event) => event.stopPropagation()}>
         <Menu
           options={[
+            {
+              key: 'pin',
+              label: t(session.pinned ? 'unpinSession' : 'pinSession'),
+              icon: <IconPinOutline16 />,
+              onSelect: () => toggleSessionPin(session.id),
+            },
             {
               key: 'rename',
               label: t('sessionItemMenuRenameOption'),
               icon: <IconEditOutline16 />,
               onSelect: () => setEditing(true),
             },
-            {
-              key: 'export-markdown',
-              label: t('exportMarkdown'),
-              icon: <IconDownloadOutline16 />,
-              onSelect: () => {
-                void exportSessionMarkdown(session.id)
-                  .then((ok) =>
-                    showToast(
-                      ok
-                        ? { key: 'exportMarkdownDone' }
-                        : { key: 'exportMarkdownFailed', type: 'error' }
-                    )
-                  )
-                  .catch(() => showToast({ key: 'exportMarkdownFailed', type: 'error' }))
-              },
-            },
+            ...(session.ephemeral
+              ? []
+              : [
+                  {
+                    key: 'export-image',
+                    label: t('exportImage'),
+                    icon: <IconDownloadOutline16 />,
+                    onSelect: () => {
+                      void downloadSessionImage(session.id)
+                        .then(() => showToast({ key: 'exportImageDone' }))
+                        .catch(() => showToast({ key: 'exportImageFailed', type: 'error' }))
+                    },
+                  },
+                  {
+                    key: 'export-markdown',
+                    label: t('exportMarkdown'),
+                    icon: <IconDownloadOutline16 />,
+                    onSelect: () => {
+                      void exportSessionMarkdown(session.id)
+                        .then((ok) =>
+                          showToast(
+                            ok
+                              ? { key: 'exportMarkdownDone' }
+                              : { key: 'exportMarkdownFailed', type: 'error' }
+                          )
+                        )
+                        .catch(() =>
+                          showToast({ key: 'exportMarkdownFailed', type: 'error' })
+                        )
+                    },
+                  },
+                ]),
             {
               key: 'delete',
               label: t('delete'),

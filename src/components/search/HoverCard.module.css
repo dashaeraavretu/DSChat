@@ -4,7 +4,7 @@
   box-sizing: border-box;
   max-width: 355px;
   padding: 16px;
-  border-radius: 12px;
+  border-radius: var(--ds-radius-12);
   border: 1px solid var(--dsw-alias-border-inverted);
   background: var(--dsw-specific-menu);
   box-shadow: var(--dsw-shadow-lv3);

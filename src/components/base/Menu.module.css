@@ -8,7 +8,7 @@
   box-sizing: border-box;
   min-width: 124px;
   padding: 4px;
-  border-radius: 12px;
+  border-radius: var(--ds-radius-12);
   background-color: var(--dsw-specific-menu);
   box-shadow:
     0 0 1px rgba(0, 0, 0, 0.2),
@@ -24,7 +24,7 @@
   box-sizing: border-box;
   padding: 8px 10px;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--ds-radius-8);
   background: none;
   color: var(--dsw-alias-label-primary);
   font: inherit;

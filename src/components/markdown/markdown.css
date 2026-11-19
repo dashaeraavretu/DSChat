@@ -197,7 +197,7 @@
   font-family: var(--ds-font-family-code);
   font-size: 0.875em !important;
   background-color: var(--dsw-alias-markdown-inline-code);
-  border-radius: 6px;
+  border-radius: var(--ds-radius-6);
   padding: 0 5px;
 }
 .ds-markdown {
@@ -222,6 +222,8 @@
 
 .ds-markdown-math.katex-display {
   display: block;
+  /* 外层 wrap 负责段落间距；这里归零，避免 span 嵌套后 :first-child 恒命中 */
+  margin: 0;
   text-align: center;
   overflow-x: auto;
   overflow-y: hidden;
@@ -229,15 +231,15 @@
   padding: 4px;
 }
 
-.ds-markdown > * .ds-markdown-math {
+.ds-markdown .ds-markdown-math-wrap {
   margin: 16px 0;
 }
 
-.ds-markdown > * .ds-markdown-math:first-child {
+.ds-markdown .ds-markdown-math-wrap:first-child {
   margin-top: 0;
 }
 
-.ds-markdown > * .ds-markdown-math:last-child {
+.ds-markdown .ds-markdown-math-wrap:last-child {
   margin-bottom: 0;
 }
 
@@ -280,7 +282,7 @@
   padding: 0 4px;
   min-width: 14px;
   font-variant: tabular-nums;
-  border-radius: 6px 6px 6px 0;
+  border-radius: var(--ds-radius-6) var(--ds-radius-6) var(--ds-radius-6) 0;
   box-shadow: inset 0 0 0 0.5px var(--dsw-alias-border-l1);
   box-sizing: border-box;
   user-select: none;
@@ -312,13 +314,13 @@
 
 .md-code-block {
   --dsl-code-block-banner-background-color: var(--dsw-alias-markdown-code-block-banner);
-  --dsl-code-block-border-radius: 12px;
+  --dsl-code-block-border-radius: var(--ds-radius-12);
   --dsl-code-block-banner-font: var(--dsw-font-xs-13);
   --dsl-code-block-content-font: var(--dsw-font-markdown-code-block);
 
   color: var(--dsw-alias-label-primary);
   background: var(--dsw-alias-markdown-code-block);
-  border-radius: var(--dsl-code-block-border-radius);
+  border-radius:var(--dsl-code-block-border-radius);
 }
 
 .md-code-block:not(:last-child) {
@@ -377,4 +379,56 @@
   padding: 16px;
   color: var(--dsw-alias-label-secondary);
   font-size: 14px;
+}
+
+.ds-markdown-math-wrap {
+  position: relative;
+  display: block;
+}
+
+.ds-math-copy {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: var(--ds-radius-8);
+  background-color: var(--dsw-alias-bg-layer-2);
+  color: var(--dsw-alias-label-secondary);
+  opacity: 0;
+  /* 隐藏时不拦截公式文本的选择与消息点击 */
+  pointer-events: none;
+  user-select: none;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.ds-markdown-math-wrap:hover .ds-math-copy,
+.ds-math-copy:focus-visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.ds-math-copy:hover {
+  color: var(--dsw-alias-label-primary);
+}
+
+.ds-math-copy:focus-visible {
+  outline: 2px solid var(--dsw-alias-brand-text);
+  outline-offset: 2px;
+}
+
+/* 触摸设备没有 hover，按钮常显，避免出现不可见的可点击区域 */
+@media (hover: none) {
+  .ds-math-copy {
+    opacity: 1;
+    pointer-events: auto;
+  }
 }

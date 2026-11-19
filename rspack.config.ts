@@ -146,6 +146,7 @@ export const createConfig = ({
         type: 'javascript/auto',
       },
       { test: /\.(woff2?|ttf)$/, type: 'asset/resource' },
+      { test: /\.svg$/, type: 'asset/resource' },
     ],
   },
   plugins: [
@@ -167,7 +168,15 @@ export const createConfig = ({
       __VERIFY_MODE__: JSON.stringify(provider.verifyMode),
     }),
     new rspack.CopyRspackPlugin({
-      patterns: [{ from: path.resolve(root, 'LICENSE'), to: 'LICENSE', toType: 'file' }],
+      patterns: [
+        { from: path.resolve(root, 'LICENSE'), to: 'LICENSE', toType: 'file' },
+        { from: path.resolve(root, 'THIRD_PARTY_NOTICES.md'), to: 'THIRD_PARTY_NOTICES.md', toType: 'file' },
+        { from: path.resolve(root, 'build/site.webmanifest'), to: 'site.webmanifest', toType: 'file' },
+        { from: path.resolve(root, 'build/favicon-32.png'), to: 'favicon-32.png', toType: 'file' },
+        { from: path.resolve(root, 'build/favicon-192.png'), to: 'favicon-192.png', toType: 'file' },
+        { from: path.resolve(root, 'build/favicon-512.png'), to: 'favicon-512.png', toType: 'file' },
+        { from: path.resolve(root, 'build/maskable-512.png'), to: 'maskable-512.png', toType: 'file' },
+      ],
     }),
   ],
   performance: { hints: false },

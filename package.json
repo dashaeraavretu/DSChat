@@ -1,6 +1,6 @@
 {
   "name": "dschat",
-  "version": "0.2.1",
+  "version": "0.3.3",
   "description": "DSChat：基于 DeepSeek 开源 chat-demo 的跨平台桌面聊天客户端。",
   "license": "MIT",
   "author": "DSChat contributors",
@@ -9,17 +9,20 @@
   "main": "electron/main.mjs",
   "scripts": {
     "dev": "rspack serve -c rspack.config.ts",
-    "dev:desktop": "concurrently -k \"rspack serve -c rspack.config.ts\" \"wait-on tcp:8090 && cross-env DSCHAT_DEV=1 electron .\"",
-    "build:web": "rimraf dist && cross-env NODE_ENV=production DSCHAT_DISPLAY_VERSION=0.2.1.2 rspack build -c rspack.config.ts",
-    "build:test": "rimraf dist && cross-env NODE_ENV=production DSCHAT_PROFILE=qianji DSCHAT_DISPLAY_VERSION=0.2.1.2 rspack build -c rspack.config.ts",
+    "dev:desktop": "node scripts/write-provider-config.mjs && concurrently -k \"rspack serve -c rspack.config.ts\" \"wait-on tcp:8090 && cross-env DSCHAT_DEV=1 electron .\"",
+    "provider:config": "node scripts/write-provider-config.mjs",
+    "build:web": "node scripts/write-provider-config.mjs && rimraf dist && cross-env NODE_ENV=production DSCHAT_DISPLAY_VERSION=0.3.3 rspack build -c rspack.config.ts",
+    "build:test": "cross-env DSCHAT_PROFILE=qianji node scripts/write-provider-config.mjs && rimraf dist && cross-env NODE_ENV=production DSCHAT_PROFILE=qianji DSCHAT_DISPLAY_VERSION=0.3.3 rspack build -c rspack.config.ts",
     "build": "pnpm build:web",
     "start": "pnpm build && electron .",
     "smoke": "electron . --smoke",
     "smoke:blob": "electron . --smoke-blob",
+    "test": "node tests/run-all.mjs",
+    "test:proxy": "cross-env DSCHAT_PROXY_ALLOW_LOOPBACK=1 electron . --smoke-proxy",
     "icon": "node scripts/generate-icon.mjs",
-    "dist:win": "pnpm build && electron-builder --win --config.win.artifactName=DSChat-0.2.1.2-x64.exe",
-    "dist:test": "rimraf release-test && pnpm build:test && electron-builder --win --config.directories.output=release-test --config.win.artifactName=DSChat-0.2.1.2-qianji-test-x64.exe",
-    "dist:dir": "pnpm build && electron-builder --win --dir",
+    "dist:win": "pnpm build:web && electron-builder --win --config.win.artifactName=DSChat-0.3.3-x64.exe",
+    "dist:test": "rimraf release-test && pnpm build:test && electron-builder --win --config.directories.output=release-test --config.win.artifactName=DSChat-0.3.3-qianji-test-x64.exe",
+    "dist:dir": "pnpm build:web && electron-builder --win --dir",
     "type": "tsc -p tsconfig.json",
     "lint": "oxlint src rspack.config.ts",
     "format": "oxfmt --write ."
@@ -74,18 +77,23 @@
     "files": [
       "dist/**/*",
       "electron/**/*",
-      "build/icon.png",
-      "!**/*.map",
-      "!node_modules/**/*"
+      "!electron/proxy-smoke.mjs",
+      "build/**/*",
+      "!node_modules/**/*",
+      "!**/*.map"
     ],
     "extraResources": [
       {
         "from": "LICENSE",
         "to": "LICENSE"
+      },
+      {
+        "from": "THIRD_PARTY_NOTICES.md",
+        "to": "THIRD_PARTY_NOTICES.md"
       }
     ],
     "win": {
-      "icon": "build/icon.png",
+      "icon": "build/icon.ico",
       "target": [
         {
           "target": "nsis",

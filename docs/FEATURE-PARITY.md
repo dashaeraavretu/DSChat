@@ -533,10 +533,11 @@
 **桌面版预期行为**
 
 - 每个用户使用自己的 Key；首次无 Key 自动打开设置，校验通过才保存。
-- 校验使用 `GET /models`（不产生生成费用）。
+- Key 由主进程校验并保存；渲染进程只看到布尔值 `hasApiKey`，不接触明文。
 - Key 优先用 Electron `safeStorage` 加密后写入 `userData/secrets.json`（Windows DPAPI）；文件采用临时文件 + rename。
-- 设置页提供“清除 API Key”：确认后通过桥接删除文件、清空内存并清理旧 localStorage 键；重启自动加载解密后的 Key。
-- `safeStorage` 不可用时退化为明文 `"encrypted": false`，设置页显示“未加密/降级”；IPC 保存失败时渲染层回退 localStorage（重启后仍加载），同样标记为降级。
+- `safeStorage` 不可用时 Key 只保留在主进程内存，设置页显示“未加密/降级”，重启后需重新输入；不写明文文件，也不回退 `localStorage`。
+- 设置页提供“清除 API Key”：确认后通过桥接删除文件、清空主进程内存并清理旧 localStorage 键；重启自动加载解密后的 Key。
+- 所有需要鉴权的请求（Messages、Files、ASR、TTS、模型校验）由主进程代理发出；渲染层不能直连上游或指定任意 URL。
 - 网页版仍使用 `localStorage` 的 `chat-demo:api-key`；桌面端迁移旧键成功后删除。
 - Key 不进入历史导出、日志、构建产物。
 
@@ -545,9 +546,10 @@
 1. 首次启动输入无效 Key，确认校验失败且不落盘。
 2. 输入有效 Key，确认 `secrets.json` 的 `encrypted: true` 且无明文。
 3. 重启确认无需重输；通过桥接清除后文件消失。
-4. 校验文件权限、临时文件清理和异常 JSON 的容错。
-5. 模拟加密不可用（开发构建打桩），确认设置页显示“未加密/降级”，而不是“已加密”。
+4. 确认渲染进程无法读取 `apiKey`，`localStorage` 中没有桌面端 Key。
+5. 模拟加密不可用（开发构建打桩），确认 Key 仅在主进程内存、设置页显示“未加密/降级”，且不写明文。
 6. 网页版写入旧键后启动桌面版，确认迁移并删除 localStorage 旧键。
+7. 运行 `pnpm test:proxy`，确认代理对 mock 上游的校验、流式、停止、附件、ASR/TTS 正常。
 
 **v1 状态：复刻（桌面适配）。**
 
@@ -558,6 +560,8 @@
 - 使用 `dsc://app` 自定义协议加载 `dist/`：`standard`、`secure`、支持 fetch/CORS/stream，使 IndexedDB、localStorage、WebCrypto、getUserMedia 正常工作。
 - 开发模式 `DSCHAT_DEV=1` 加载 `http://localhost:8090`。
 - `contextIsolation: true`、`sandbox: true`、`nodeIntegration: false`；preload 只暴露白名单桥接。
+- `dsc://app` 的 HTML 响应带严格 CSP：`script-src 'self'`（禁内联脚本）、`connect-src 'self'`（渲染层不直连 API）、`object-src 'none'`、`base-uri 'none'`；`style-src` 额外允许内联样式以支持 KaTeX/Mermaid。
+- Messages、Files、ASR、TTS 与模型校验经主进程代理发出；Key 不进入渲染进程，代理目标只能来自构建期 provider 白名单。
 - 外部链接通过系统浏览器打开；应用内禁止任意外部导航和 `<webview>`。附件/图片原件的同源 `blob:` 预览使用同 partition、无 preload、`sandbox`/`contextIsolation` 的受控预览子窗口；子窗口只允许停留在初始 `blob:`，外部导航、重定向与新窗口全部拦截；`data:` URL 不放行。父级 localStorage 隔离未在 0.1.3 实现，defer 到 v1.1。
 - 只放行受信任页面的音频权限；摄像头及 `audio+video` 组合请求一律拒绝。
 - 单实例锁；生产包禁用 DevTools；窗口最小尺寸 900×620；应用标题 DSChat。
@@ -581,9 +585,9 @@
 
 1. **服务端扩展依赖**：智能搜索、链接阅读、ASR/TTS、安全过滤、自动标题、继续生成、`latest_reminder` 均需 DeepSeek 官方或兼容服务支持。仅替换普通 OpenAI 风格接口不足以实现这些功能。
 2. **`document` 块兼容性**：应用始终开启扩展模式（`safety_check: high`、`deepseek_read_url`），而类型注释指出扩展模式可能不支持非图片 `document` 块并返回 400。PDF/Office/文本附件必须在目标服务上单独验收。
-3. **`dsc://app` CORS 风险**：渲染层从自定义协议源直接请求 API，没有主进程代理。若服务端只允许网页源或不允许 `dsc://app`，打包版请求会失败。上线前必须验证；必要时补主进程代理。
+3. **`dsc://app` CORS 已不再是阻断项**：桌面版的 Messages、Files、ASR、TTS 与模型校验全部由主进程代理发出，不依赖渲染层的 CORS。自建网关只需在构建时设置 `DSCHAT_API_ORIGIN`；构建脚本会把结果写入 `electron/provider-config.json`，主进程用同一份配置作为默认 provider 与代理白名单。网页版仍需服务端允许相应 CORS。
 4. **本地附件打开（v1 已处理）**：已发送的附件/图片原件通过 `window.open(blob:…)` 打开；主进程仅对同源 `blob:` 放行受控预览子窗口（同 partition、无 preload、`sandbox`/`contextIsolation`），子窗口导航、重定向与新窗口均被拦截；`data:` 不放行，`http/https` 仍交给系统浏览器。`pnpm smoke:blob` 与真实 PNG/PDF 预览实测通过。预览与主窗口同源，父级 localStorage 隔离 defer 到 v1.1。
-5. **密钥生命周期**：设置页已提供“清除 API Key”（确认后删除 `secrets.json`、主进程内存与旧 localStorage 键）；仍没有启动时校验。`safeStorage` 不可用或回退 localStorage 时，设置页按主进程状态显示“未加密/降级”，不再声称已加密；发布说明仍应披露降级路径。
+5. **密钥生命周期**：Key 只由主进程持有；`safeStorage` 可用时加密落盘，不可用时仅保留在主进程内存并在设置页显示“未加密/降级”，不写明文、不回退 localStorage。设置页提供“清除 API Key”。启动时仍未主动校验 Key，首次请求失败后按原有错误提示处理。
 6. **网页版与桌面版数据不互通**：`localhost:8090`、`dsc://app` 和 `file://` 是不同存储源，会话/附件不会自动迁移；只有 API Key 有迁移逻辑。历史需通过 ZIP 导入导出。
 7. **远端文件生命周期**：`deleteFile` 从未调用；删除会话、移除附件或删除全部对话都不会删除已上传到 API 服务的文件，可能累积占用配额，且删除确认文案与实际行为不一致。
 8. **历史与流式提示的边界**：只支持版本 3、ZIP32、STORE/DEFLATE、非加密单卷；导入后引用、模型、思考签名、结构化错误、`latestReminder` 等不保留，回复不能继续。导入失败界面统一显示通用错误，不区分具体原因；空消息的流中断错误可能没有可见提示。
@@ -591,6 +595,6 @@
 10. **提示文案差异**：拖拽遮罩写“最多 50 个、每个 64 MB”，但 `user_data` 类文件实际上限 32 MB；月份分组显示原始 `YYYY-MM`。
 11. **朗读与语音依赖服务端**：ASR/TTS 不可用时输入和朗读入口会报错；桌面版不做本地识别或本地语音合成。
 12. **自动更新与签名**：未包含自动更新；未签名安装包会触发 SmartScreen。代码签名与更新源属于发布配置，不在功能复刻范围内。
-13. **包元数据**：`package.json` 的 `name` 仍是 `chat-demo`、`description` 仍是上游网页版文案，而 `productName` 为 DSChat。功能不受影响，但发布前建议统一名称与描述。
+13. **包元数据**：`package.json` 的 `name` 已统一为 `dschat`，`description` 与 `productName` 均为 DSChat；发布前仍建议核对安装包属性中的 ProductName/FileVersion。
 14. **`README.zh-CN.md`**：按任务边界未修改，仍是上游网页版说明；英文 README 与 `docs/` 描述桌面版。后续可由维护者同步中文文档。
 15. **并行开发影响**：`src/`、`electron/`、`package.json` 由其他工作流修改，本文基于编写时可见实现；最终验收需以完整构建和 `node tests/smoke.mjs`、`pnpm type`、`pnpm lint` 为准。

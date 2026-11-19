@@ -7,6 +7,7 @@ import {
   IconFollowsystemOutline16,
   IconLightOutline16,
   IconSettingsOutline16,
+  IconThinkOutline16,
   IconUploadOutline14,
 } from '../base/icons.js'
 import {
@@ -25,12 +26,25 @@ import {
   setCloseToTray,
   setLocale,
   setLocation,
+  setAppearance,
   setNotifyOnComplete,
+  setNotifySound,
+  setReadingWidth,
+  setSendKey,
+  setShowInputCount,
+  setProxyPreference,
+  setShowMascot,
   setThemePreference,
+  setTtsSpeed,
   setTtsVoice,
   setZoomPreference,
   useSettings,
+  type Appearance,
+  type ProxyMode,
+  type ReadingWidth,
+  type SendKey,
   type ThemePreference,
+  type TtsSpeed,
   type ZoomFactor,
 } from '../../services/settings.js'
 import {
@@ -45,6 +59,7 @@ import { Modal } from '../base/Modal.js'
 import { Select } from '../base/Select.js'
 import { showToast } from '../base/toastState.js'
 import { ApiKeyConfirm, ApiKeyField, useApiKeyEditor } from './ApiKeyField.js'
+import { PresetsSection } from './PresetsSection.js'
 import { closeSettings, useSettingsDialog, type SettingsSection } from './settingsDialogState.js'
 import styles from './Settings.module.css'
 
@@ -64,6 +79,11 @@ const sections: { value: SettingsSection; label: TranslationKey; icon: ReactNode
     icon: <IconSettingsOutline16 />,
   },
   { value: 'data', label: 'settingDialogAsideDataOptionLabel', icon: <IconDataOutline16 /> },
+  {
+    value: 'presets',
+    label: 'settingDialogAsidePresetsOptionLabel',
+    icon: <IconThinkOutline16 />,
+  },
 ]
 
 const SettingsContent = () => {
@@ -118,7 +138,9 @@ const SettingsContent = () => {
           ))}
         </div>
         <div role="tabpanel" className={styles.content}>
-          {section === 'general' ? (
+          {section === 'presets' ? (
+            <PresetsSection />
+          ) : section === 'general' ? (
             <>
               <ThemeSetting />
               <LocaleSetting />
@@ -126,12 +148,20 @@ const SettingsContent = () => {
               <LocationSetting />
               <CloseToTraySetting />
               <NotificationSetting />
+              <NotificationSoundSetting />
               <ZoomSetting />
+              <AppearanceSetting />
+              <MascotSetting />
+              <InputCountSetting />
+              <ReadingWidthSetting />
+              <ProxySetting />
+              <TtsSpeedSetting />
+              <SendKeySetting />
             </>
           ) : (
             <>
               <ApiKeyField editor={apiKeyEditor} />
-              {apiKeyEditor.apiKey ? (
+              {apiKeyEditor.hasApiKey ? (
                 <SettingCell
                   label={t('apiKeyClear')}
                   status={null}
@@ -549,6 +579,79 @@ const CloseToTraySetting = () => {
   )
 }
 
+const NotificationSoundSetting = () => {
+  const t = useTranslate()
+  const notifySound = useSettings((state) => state.notifySound)
+  return (
+    <SettingCell
+      label={t('settingsNotifySound')}
+      description={t('settingsNotifySoundDescription')}
+      status={null}
+      action={
+        <button
+          type="button"
+          role="switch"
+          aria-checked={notifySound}
+          aria-label={t('settingsNotifySound')}
+          className={clsx(styles.switch, notifySound && styles.switchOn)}
+          onClick={() => setNotifySound(!notifySound)}
+        >
+          <span className={styles.switchThumb} />
+        </button>
+      }
+    />
+  )
+}
+
+const ProxySetting = () => {
+  const t = useTranslate()
+  const mode = useSettings((state) => state.proxyMode)
+  const host = useSettings((state) => state.proxyHost)
+  const port = useSettings((state) => state.proxyPort)
+  const change = (patch: { mode?: ProxyMode; host?: string; port?: string }) => {
+    setProxyPreference(patch)
+    showToast({ key: 'proxyRestartHint' })
+  }
+  return (
+    <SettingCell
+      label={t('settingsProxy')}
+      description={t('settingsProxyDescription')}
+      status={null}
+      action={
+        <div className={styles.proxyFields}>
+          <Select
+            ariaLabel={t('settingsProxy')}
+            value={mode}
+            options={[
+              { value: 'system', label: t('proxySystem') },
+              { value: 'http', label: t('proxyHttp') },
+              { value: 'socks5', label: t('proxySocks5') },
+            ]}
+            onChange={(value) => change({ mode: value as ProxyMode })}
+          />
+          {mode !== 'system' ? (
+            <>
+              <input
+                className={styles.presetInput}
+                placeholder={t('proxyHost')}
+                value={host}
+                onChange={(event) => change({ host: event.target.value })}
+              />
+              <input
+                className={styles.presetInput}
+                placeholder={t('proxyPort')}
+                inputMode="numeric"
+                value={port}
+                onChange={(event) => change({ port: event.target.value })}
+              />
+            </>
+          ) : null}
+        </div>
+      }
+    />
+  )
+}
+
 const NotificationSetting = () => {
   const t = useTranslate()
   const notifyOnComplete = useSettings((state) => state.notifyOnComplete)
@@ -595,6 +698,146 @@ const ZoomSetting = () => {
             label: `${Math.round(factor * 100)}%`,
           }))}
           onChange={(value) => setZoomPreference(Number(value) as ZoomFactor)}
+        />
+      }
+    />
+  )
+}
+
+const AppearanceSetting = () => {
+  const t = useTranslate()
+  const appearance = useSettings((state) => state.appearance)
+  return (
+    <SettingCell
+      label={t('settingsAppearance')}
+      status={null}
+      action={
+        <Select
+          ariaLabel={t('settingsAppearance')}
+          value={appearance}
+          options={[
+            { value: 'original', label: t('appearanceOriginal') },
+            { value: 'tui', label: t('appearanceTui') },
+            { value: 'fish', label: t('appearanceFish') },
+            { value: 'paper', label: t('appearancePaper') },
+          ]}
+          onChange={(value) => setAppearance(value as Appearance)}
+        />
+      }
+    />
+  )
+}
+
+const MascotSetting = () => {
+  const t = useTranslate()
+  const showMascot = useSettings((state) => state.showMascot)
+  const appearance = useSettings((state) => state.appearance)
+  return (
+    <SettingCell
+      label={t('settingsShowMascot')}
+      description={t('settingsShowMascotDescription')}
+      status={null}
+      action={
+        <button
+          type="button"
+          role="switch"
+          aria-checked={showMascot}
+          aria-label={t('settingsShowMascot')}
+          className={clsx(styles.switch, showMascot && styles.switchOn)}
+          disabled={appearance !== 'fish'}
+          onClick={() => setShowMascot(!showMascot)}
+        >
+          <span className={styles.switchThumb} />
+        </button>
+      }
+    />
+  )
+}
+
+const InputCountSetting = () => {
+  const t = useTranslate()
+  const showInputCount = useSettings((state) => state.showInputCount)
+  return (
+    <SettingCell
+      label={t('settingsInputCount')}
+      status={null}
+      action={
+        <button
+          type="button"
+          role="switch"
+          aria-checked={showInputCount}
+          aria-label={t('settingsInputCount')}
+          className={clsx(styles.switch, showInputCount && styles.switchOn)}
+          onClick={() => setShowInputCount(!showInputCount)}
+        >
+          <span className={styles.switchThumb} />
+        </button>
+      }
+    />
+  )
+}
+
+const ReadingWidthSetting = () => {
+  const t = useTranslate()
+  const readingWidth = useSettings((state) => state.readingWidth)
+  return (
+    <SettingCell
+      label={t('settingsReadingWidth')}
+      status={null}
+      action={
+        <Select
+          ariaLabel={t('settingsReadingWidth')}
+          value={readingWidth}
+          options={[
+            { value: 'comfortable', label: t('readingComfortable') },
+            { value: 'wide', label: t('readingWide') },
+          ]}
+          onChange={(value) => setReadingWidth(value as ReadingWidth)}
+        />
+      }
+    />
+  )
+}
+
+const TtsSpeedSetting = () => {
+  const t = useTranslate()
+  const ttsSpeed = useSettings((state) => state.ttsSpeed)
+  return (
+    <SettingCell
+      label={t('settingsTtsSpeed')}
+      status={null}
+      action={
+        <Select
+          ariaLabel={t('settingsTtsSpeed')}
+          value={String(ttsSpeed)}
+          options={[
+            { value: '0.8', label: t('ttsSpeedSlow') },
+            { value: '1', label: t('ttsSpeedNormal') },
+            { value: '1.2', label: t('ttsSpeedFast') },
+          ]}
+          onChange={(value) => setTtsSpeed(Number(value) as TtsSpeed)}
+        />
+      }
+    />
+  )
+}
+
+const SendKeySetting = () => {
+  const t = useTranslate()
+  const sendKey = useSettings((state) => state.sendKey)
+  return (
+    <SettingCell
+      label={t('settingsSendKey')}
+      status={null}
+      action={
+        <Select
+          ariaLabel={t('settingsSendKey')}
+          value={sendKey}
+          options={[
+            { value: 'enter', label: t('sendKeyEnter') },
+            { value: 'ctrlEnter', label: t('sendKeyCtrlEnter') },
+          ]}
+          onChange={(value) => setSendKey(value as SendKey)}
         />
       }
     />
@@ -685,6 +928,10 @@ const AboutDialog = ({ onClose }: { onClose: () => void }) => {
         </div>
       ) : null}
       <div className={styles.aboutDescription}>{t('diagnosticsDescription')}</div>
+      <div className={styles.aboutDescription}>
+        {t('thirdPartyLicenses')}: React, Zustand, KaTeX, Mermaid, Prism, idb, fflate, Twemoji (CC-BY 4.0) ·
+        THIRD_PARTY_NOTICES.md
+      </div>
     </Modal>
   )
 }

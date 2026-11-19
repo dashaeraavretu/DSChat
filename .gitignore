@@ -12,3 +12,4 @@ out/
 tmp/
 *.tsbuildinfo
 release-test/
+electron/provider-config.json

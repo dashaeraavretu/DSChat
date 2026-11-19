@@ -1,6 +1,8 @@
 import { create } from 'zustand'
 import { translate } from '../../i18n/index.js'
 import { createId } from '../../utils/id.js'
+import { getDefaultPreset, snapshotPreset } from '../presets.js'
+import { ORIGINAL_SYSTEM_PROMPT, renderPrompt } from '../promptVariables.js'
 import { ApiError, streamMessage } from '../api/client.js'
 import { API_MODEL, FEATURES } from '../buildInfo.js'
 import type { ChatModel, CreateMessageRequest } from '../api/types.js'
@@ -17,6 +19,7 @@ import {
   prepareDraftMessage,
 } from './drafts.js'
 import { createLatestReminder } from './latestReminder.js'
+import { withQuote, type Quote } from '../quote.js'
 import {
   applyEvent,
   canContinueReply,
@@ -37,7 +40,7 @@ import {
 /** 构建期模型；默认 deepseek-flash，测试 provider 可覆盖 */
 const MODEL: ChatModel = API_MODEL
 /** 所有生成请求统一携带的助手身份说明 */
-const SYSTEM_PROMPT = '该助手为DeepSeek，由深度求索公司创造。'
+const SYSTEM_PROMPT = ORIGINAL_SYSTEM_PROMPT
 /** 保留最近打开的详情；当前会话、生成中及尚未成功保存的会话不淘汰。 */
 const SESSION_CACHE_LIMIT = 5
 /** 安全审核固定开启，所有请求都走扩展模式 */
@@ -77,6 +80,8 @@ type ChatState = {
   sessionSaveErrors: Record<string, boolean>
   /** null 表示新对话（欢迎页） */
   activeId: string | null
+  /** 下一次新对话发送后是否创建临时会话 */
+  ephemeralNewChat: boolean
   /** 正在生成回复的会话 */
   streaming: Record<string, AbortController>
 }
@@ -90,13 +95,16 @@ export const useChatStore = create<ChatState>(() => ({
   sessionLoadErrors: {},
   sessionSaveErrors: {},
   activeId: null,
+  ephemeralNewChat: false,
   streaming: {},
 }))
 
 const { getState: get, setState: set } = useChatStore
 
 const sortSessions = (sessions: SessionSummary[]) =>
-  [...sessions].sort((a, b) => b.updatedAt - a.updatedAt)
+  [...sessions].sort(
+    (a, b) => Number(b.pinned === true) - Number(a.pinned === true) || b.updatedAt - a.updatedAt
+  )
 
 const getSession = (id: string) => {
   const cache = get().sessionCache
@@ -109,7 +117,11 @@ const getStreamController = (id: string) => {
 }
 
 const sameSummary = (a: SessionSummary, b: SessionSummary) =>
-  a.title === b.title && a.createdAt === b.createdAt && a.updatedAt === b.updatedAt
+  a.title === b.title &&
+  a.createdAt === b.createdAt &&
+  a.updatedAt === b.updatedAt &&
+  Boolean(a.pinned) === Boolean(b.pinned) &&
+  Boolean(a.ephemeral) === Boolean(b.ephemeral)
 
 const sessionAccess = new Map<string, number>()
 const unsavedSessions = new Set<string>()
@@ -135,6 +147,8 @@ const trimSessionCache = () => {
     .filter(
       (id) =>
         id !== state.activeId &&
+        // 临时会话不在 IndexedDB 里，淘汰后无法重新读取，只能一直留在内存中。
+        !state.sessionCache[id]?.ephemeral &&
         !Object.hasOwn(state.streaming, id) &&
         !unsavedSessions.has(id) &&
         !deletingSessions.has(id)
@@ -187,6 +201,9 @@ const updateReply = (sessionId: string, reply: AssistantMessage) =>
 
 const persist = (sessionId: string) => {
   const session = getSession(sessionId)
+  if (session?.ephemeral) {
+    return
+  }
   if (session) {
     unsavedSessions.add(sessionId)
     if (deletingSessions.has(sessionId)) {
@@ -431,6 +448,8 @@ export const replaceHistory = async (write: () => Promise<void>): Promise<number
       sessionLoadErrors: {},
       sessionSaveErrors: {},
       activeId: null,
+      // 临时会话只属于当前内存；替换/清空历史后连同意图一起丢弃。
+      ephemeralNewChat: false,
     })
     return summaries.length
   } finally {
@@ -446,17 +465,48 @@ export const replaceHistory = async (write: () => Promise<void>): Promise<number
   }
 }
 
-export const newChat = () => {
+export const newChat = (ephemeral = false) => {
   if (!get().importingHistory) {
-    set({ activeId: null })
+    set({ activeId: null, ephemeralNewChat: ephemeral })
     trimSessionCache()
+  }
+}
+
+/** 置顶/取消置顶；临时会话只改内存，未加载的普通会话直接更新摘要与库。 */
+export const toggleSessionPin = (sessionId: string) => {
+  if (get().importingHistory || deletingSessions.has(sessionId)) {
+    return
+  }
+  const session = getSession(sessionId)
+  if (session) {
+    updateSession(sessionId, (current) => ({
+      ...current,
+      pinned: current.pinned ? undefined : true,
+    }))
+    persist(sessionId)
+    return
+  }
+  const summary = get().sessions.find((item) => item.id === sessionId)
+  if (!summary) {
+    return
+  }
+  const pinned = !summary.pinned
+  set((state) => ({
+    sessions: sortSessions(
+      state.sessions.map((item) =>
+        item.id === sessionId ? toSessionSummary({ ...item, pinned }) : item
+      )
+    ),
+  }))
+  if (!summary.ephemeral) {
+    void db.setSessionPinned(sessionId, pinned).catch(db.reportStorageError('pin session'))
   }
 }
 
 export const selectSession = (id: string) => {
   if (!get().importingHistory && get().sessions.some((session) => session.id === id)) {
     touchSession(id)
-    set({ activeId: id })
+    set({ activeId: id, ephemeralNewChat: false })
     void ensureSessionLoaded(id)
     trimSessionCache()
   }
@@ -498,6 +548,9 @@ const removeSessionData = async (id: string): Promise<boolean> => {
     return false
   }
   const epoch = historyEpoch
+  const ephemeral =
+    get().sessions.find((session) => session.id === id)?.ephemeral === true ||
+    getSession(id)?.ephemeral === true
   deletingSessions.add(id)
   try {
     getStreamController(id)?.abort()
@@ -506,9 +559,14 @@ const removeSessionData = async (id: string): Promise<boolean> => {
     if (epoch !== historyEpoch) {
       return false
     }
-    await db.deleteSession(id)
-    if (epoch !== historyEpoch) {
-      return true
+    if (ephemeral) {
+      // 临时会话从未落盘；顺带清理可能存在的旧记录，失败也不影响从列表移除。
+      void db.deleteSession(id).catch(db.reportStorageError('delete ephemeral session'))
+    } else {
+      await db.deleteSession(id)
+      if (epoch !== historyEpoch) {
+        return true
+      }
     }
     sessionLoads.delete(id)
     sessionAccess.delete(id)
@@ -559,7 +617,7 @@ export const sendMessage = (targetSessionId: string | null) => {
   if (!prepared) {
     return false
   }
-  const { text, files } = prepared
+  const { text, files, quote } = prepared
   const now = Date.now()
   let sessionId = targetSessionId
   if (
@@ -569,6 +627,7 @@ export const sendMessage = (targetSessionId: string | null) => {
     return false
   }
   if (sessionId === null) {
+    const preset = getDefaultPreset()
     const session: Session = {
       id: createId(),
       title: '',
@@ -576,6 +635,8 @@ export const sendMessage = (targetSessionId: string | null) => {
       updatedAt: now,
       messages: [],
       rootMessageId: null,
+      ...(preset ? { preset: snapshotPreset(preset) } : {}),
+      ...(get().ephemeralNewChat ? { ephemeral: true } : {}),
     }
     sessionId = session.id
     touchSession(session.id)
@@ -583,6 +644,7 @@ export const sendMessage = (targetSessionId: string | null) => {
       sessions: [toSessionSummary(session), ...state.sessions],
       sessionCache: { ...state.sessionCache, [session.id]: session },
       activeId: session.id,
+      ephemeralNewChat: false,
     }))
   }
   const current = getSession(sessionId)
@@ -617,7 +679,8 @@ export const sendMessage = (targetSessionId: string | null) => {
   }
   persist(sessionId)
   clearSentDraft(targetSessionId)
-  void streamReply(sessionId, reply, { history, question })
+  // 引用只进入本次请求快照，question 消息本身不保存引用文本。
+  void streamReply(sessionId, reply, { history, question, ...(quote ? { quote } : {}) })
   return true
 }
 
@@ -812,7 +875,13 @@ export const retryReply = (sessionId: string, messageId: string) => {
   })
 }
 
-type Request = { history: Message[]; question: UserMessage; prefix?: AssistantMessage }
+type Request = {
+  history: Message[]
+  question: UserMessage
+  prefix?: AssistantMessage
+  /** 本轮提问附带的引用；仅修改请求内容，不写入消息树 */
+  quote?: Quote
+}
 
 /** 把补传得到的 serverId 写回会话里所有引用同一附件的消息（编辑、重新生成会共用附件） */
 const saveServerIds = (sessionId: string, serverIds: Map<string, string>) => {
@@ -867,6 +936,7 @@ const refreshRequest = (sessionId: string, request: Request): Request => {
     history: request.history.map(pick),
     question: pick(request.question),
     prefix: request.prefix,
+    quote: request.quote,
   }
 }
 
@@ -935,6 +1005,7 @@ const prepareFiles = async (sessionId: string, request: Request, signal: AbortSi
     history: request.history.map(resolve),
     question: resolve(request.question),
     prefix: request.prefix,
+    quote: request.quote,
   }
 }
 
@@ -1063,8 +1134,14 @@ const streamReply = async (sessionId: string, initial: AssistantMessage, request
           useSettings.getState().apiKey ?? '',
           {
             model: initial.model ?? MODEL,
-            system: SYSTEM_PROMPT,
-            messages,
+            system: (() => {
+              const preset = getSession(sessionId)?.preset
+              return preset?.system
+                ? renderPrompt(preset.system, { char: preset.name, original: SYSTEM_PROMPT })
+                : SYSTEM_PROMPT
+            })(),
+            // 只为本轮提问的请求快照补引用上下文，不动消息树和历史轮次。
+            messages: request.quote ? withQuote(messages, request.quote) : messages,
             thinking: { type: initial.thinking ? 'enabled' : 'disabled' },
             safety_check: SAFETY_CHECK,
             tools: serverTools(initial.search ?? false),
@@ -1165,6 +1242,7 @@ const streamReply = async (sessionId: string, initial: AssistantMessage, request
       void window.desktop?.notifyGenerationDone?.({
         title: translate('appName'),
         body: translate('generationCompleteBody', { title }),
+        silent: !useSettings.getState().notifySound,
       })
     }
   }

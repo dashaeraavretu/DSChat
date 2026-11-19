@@ -60,6 +60,33 @@ DSChat v1 aims to reproduce the official demo's feature set on the desktop:
 - Markdown, syntax highlighting, KaTeX math, and Mermaid diagrams.
 - Simplified Chinese and English, light and dark themes (including follow-system), mobile layouts, location settings, and chat history import and export.
 
+Added in 0.3.3:
+
+- Strict Content-Security-Policy on `dsc://app`; no inline scripts and no direct renderer connections to the API.
+- All Messages, Files, ASR, TTS and model-verification requests now go through a main-process proxy.
+- The API key stays in the main process (`safeStorage` or memory-only); the renderer only sees `hasApiKey`.
+- Removed the plaintext `secrets.json` fallback and the `localStorage` key fallback.
+
+Added in 0.3.2:
+
+- Quote selected message text when replying.
+- Export a conversation branch as an image with KaTeX/Mermaid rendered correctly.
+- Optional completion sound.
+- HTTP / SOCKS5 proxy settings (system / manual).
+
+Added in 0.3.1:
+
+- Prompt variables (`{{user}}`, `{{char}}`, `{{date}}`, `{{time}}`, `{{original}}`).
+- Open-source decorations for empty/error/loading states with third-party notices.
+- Per-session input history (↑/↓) and an optional character counter.
+
+Added in 0.3.0:
+
+- Prompt presets in a third Settings tab: create/edit, default marker, per-session snapshot and per-turn system injection; empty chats show the preset greeting.
+- Import Tavern character cards V2/V3 from `.json` or `.png` (tEXt/iTXt `chara` / `ccv3`) into a preset; no world books, group chat or STscript.
+- Temporary chats (memory only), session pinning, comfortable/wide reading width, TTS speed 0.8/1.0/1.2, and Enter / Ctrl+Enter send preference.
+- Copy button on hover for display math blocks; CJK bold Markdown regression coverage.
+
 Added in 0.2.1:
 
 - Export a single conversation branch as Markdown from the session menu.
@@ -82,7 +109,7 @@ Some capabilities are implemented by the API service rather than the client: sma
 
 ## Data and storage
 
-- **Desktop API key:** encrypted with Electron `safeStorage` (Windows DPAPI) and written to `secrets.json` in the Electron `userData` directory. If system encryption is unavailable, the app writes a clearly marked plaintext fallback to that file and the settings screen shows an unencrypted/degraded status; if the IPC save itself fails, the renderer falls back to `localStorage` (still loaded after restart) and shows the same degraded status. Settings also provides a confirmed **Clear API Key** action.
+- **Desktop API key:** held only by the main process and encrypted with Electron `safeStorage` (Windows DPAPI) before being written to `secrets.json` in the Electron `userData` directory. If system encryption is unavailable, the key is kept in main-process memory only for that run and the settings screen shows an unencrypted/degraded status; it is never written as plaintext and never falls back to `localStorage`. The renderer only sees a boolean `hasApiKey`; every authenticated request is sent by the main process. Settings also provides a confirmed **Clear API Key** action.
 - **Web API key and settings:** stored in browser `localStorage` (`chat-demo:api-key` and related keys). Use the web build only on a trusted profile.
 - **Conversations and attachment originals:** stored locally in IndexedDB.
 - **History import/export:** ZIP archives containing conversations and locally available image originals. Exports exclude the API key, settings, and original non-image attachments.
@@ -103,6 +130,8 @@ DSCHAT_API_ORIGIN=https://api.example.com pnpm build
 $env:DSCHAT_API_ORIGIN = "https://api.example.com"; pnpm build
 ```
 
+The build writes the resolved provider (origin, endpoint paths, model, feature flags) to `electron/provider-config.json`. The main process reads this file as both its default provider and its proxy allowlist, so a packaged self-hosted build keeps working without any runtime environment variable. The renderer never requests the API directly, so server-side CORS configuration is not required for the desktop build.
+
 The endpoint must implement the Anthropic-compatible Messages / Files API and the extensions used by the demo (search, link reading, titles, `latest_reminder`, ASR/TTS). See [docs/SELF-HOST.md](docs/SELF-HOST.md) for details and security considerations.
 
 ## Development
@@ -119,6 +148,8 @@ The endpoint must implement the Anthropic-compatible Messages / Files API and th
 | `pnpm dist:test`  | Build the qianji test installer in `release-test/` |
 | `pnpm type`       | Run TypeScript type checks                    |
 | `pnpm lint`       | Lint with oxlint                              |
+| `pnpm test`       | Run all headless regression tests             |
+| `pnpm test:proxy` | Exercise the main-process API proxy against a local mock |
 | `pnpm format`     | Format with oxfmt                             |
 | `node tests/smoke.mjs` | Zero-dependency post-build smoke test    |
 

@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { useTranslate } from '../i18n/index.js'
 import {
+  applyProxyPreference,
   applyZoomPreference,
   isDesktopApp,
   migrateLegacyApiKey,
@@ -47,6 +48,7 @@ import styles from './App.module.css'
 
 export const App = () => {
   const t = useTranslate()
+  const appearance = useSettings((state) => state.appearance)
   const isMobile = useIsMobile()
   const locale = useSettings((state) => state.locale)
   // 移动端侧边栏以独立抽屉管理开合状态
@@ -148,7 +150,12 @@ export const App = () => {
   }, [isMobile])
 
   useEffect(() => {
+    document.body.dataset.dsPreset = appearance
+  }, [appearance])
+
+  useEffect(() => {
     applyZoomPreference()
+    applyProxyPreference()
   }, [])
 
   // 断网/恢复只提示，不自动重连

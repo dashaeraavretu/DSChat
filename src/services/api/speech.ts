@@ -1,5 +1,12 @@
 import { FEATURES } from '../buildInfo.js'
-import { ApiError, API_ORIGIN, request } from './client.js'
+import {
+  ApiError,
+  API_ORIGIN,
+  desktopApiRequest,
+  isDesktopApiBridge,
+  openDesktopApiStream,
+  request,
+} from './client.js'
 
 /**
  * 语音接口：
@@ -22,6 +29,21 @@ export const transcribe = async (
 ): Promise<string> => {
   if (!FEATURES.speech) {
     throw new ApiError('http', { key: 'featureUnavailableSpeech' })
+  }
+  if (isDesktopApiBridge()) {
+    const text = await desktopApiRequest<string>(
+      'transcribe',
+      {
+        data: await audio.arrayBuffer(),
+        name: 'recording.wav',
+        mimeType: audio.type || 'audio/wav',
+      },
+      signal
+    )
+    if (typeof text !== 'string') {
+      throw new ApiError('protocol', '语音识别响应无效')
+    }
+    return text
   }
   const form = new FormData()
   form.append('file', audio, 'recording.wav')
@@ -54,15 +76,26 @@ export const synthesize = async (
   apiKey: string,
   text: string,
   voice: TtsVoice,
-  signal: AbortSignal
+  signal: AbortSignal,
+  speed = 1
 ): Promise<ReadableStream<Uint8Array>> => {
   if (!FEATURES.speech) {
     throw new ApiError('http', { key: 'featureUnavailableSpeech' })
   }
+  if (isDesktopApiBridge()) {
+    // 主进程转发 PCM 字节流；停止朗读时 abort 会中止上游请求
+    return openDesktopApiStream('tts', { text, voice, speed }, signal)
+  }
   const response = await request(`${TOOLS_BASE_URL}/tts`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text, voice_id: voice, format: 'pcm', filter_markdown: true }),
+    body: JSON.stringify({
+      text,
+      voice_id: voice,
+      format: 'pcm',
+      filter_markdown: true,
+      speed,
+    }),
     signal,
   })
   if (!response.body) {

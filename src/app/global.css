@@ -1,4 +1,23 @@
 :root {
+  /* 半径 token：默认值与收敛前完全一致；外观预设可整体覆盖 */
+  --ds-radius-1: 1px;
+  --ds-radius-2: 2px;
+  --ds-radius-4: 4px;
+  --ds-radius-6: 6px;
+  --ds-radius-8: 8px;
+  --ds-radius-10: 10px;
+  --ds-radius-11: 11px;
+  --ds-radius-12: 12px;
+  --ds-radius-14: 14px;
+  --ds-radius-16: 16px;
+  --ds-radius-18: 18px;
+  --ds-radius-20: 20px;
+  --ds-radius-22: 22px;
+  --ds-radius-24: 24px;
+  --ds-radius-28: 28px;
+  --ds-radius-40: 40px;
+  --ds-radius-100: 100px;
+  --ds-radius-4096: 4096px;
   --message-list-max-width: 840px;
   --message-list-padding-horizontal: 44px;
 }

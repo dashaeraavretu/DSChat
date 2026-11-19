@@ -1,6 +1,7 @@
 import clsx from 'clsx'
 import { memo, useCallback, useEffect, useLayoutEffect, useRef } from 'react'
 import {
+  IconCloseOutline16,
   IconGlobeLanguageOutline14,
   IconPaperclipOutline16,
   IconSendOutline16,
@@ -17,9 +18,11 @@ import {
   prepareDraftMessage,
   removeDraftAttachment,
   retryDraftAttachment,
+  setDraftQuote,
   setDraftText,
   useDrafts,
 } from '../../services/chat/drafts.js'
+import { quoteText } from '../../services/quote.js'
 import { stopReadAloud } from '../../services/speech/readAloud.js'
 import { FEATURES } from '../../services/buildInfo.js'
 import { IconButton } from '../base/IconButton.js'
@@ -44,7 +47,7 @@ export const ChatInput = memo(function ChatInput({ sessionId }: { sessionId: str
 const Input = ({ sessionId }: { sessionId: string | null }) => {
   const t = useTranslate()
   const draft = useDrafts((state) => state.drafts.get(sessionId) ?? EMPTY_DRAFT)
-  const { text, attachments } = draft
+  const { text, attachments, quote } = draft
   const setText = (value: string) => setDraftText(sessionId, value)
   const draftReady = useUploads((state) => prepareDraftMessage(draft, state.tasks) !== null)
   const streaming = useChatStore(
@@ -54,6 +57,10 @@ const Input = ({ sessionId }: { sessionId: string | null }) => {
   const importingHistory = useChatStore((state) => state.importingHistory)
   const isMobile = useIsMobile()
   const search = useSettings((state) => state.search)
+  const sendKey = useSettings((state) => state.sendKey)
+  const showInputCount = useSettings((state) => state.showInputCount)
+  const historyRef = useRef<string[]>([])
+  const historyIndexRef = useRef(-1)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const togglesRef = useRef<HTMLDivElement>(null)
@@ -155,7 +162,16 @@ const Input = ({ sessionId }: { sessionId: string | null }) => {
       return
     }
     // 文本与上传完成态由提交动作读取最新快照，不使用上一次渲染的草稿。
-    if (!ensureApiKey() || !sendMessage(sessionId)) {
+    if (ensureApiKey() && sendMessage(sessionId)) {
+      const sent = getDraft(sessionId).text.trim()
+      if (sent && historyRef.current.at(-1) !== sent) {
+        historyRef.current.push(sent)
+        if (historyRef.current.length > 100) {
+          historyRef.current.shift()
+        }
+      }
+      historyIndexRef.current = -1
+    } else {
       return
     }
     stopReadAloud()
@@ -176,6 +192,24 @@ const Input = ({ sessionId }: { sessionId: string | null }) => {
       }}
     >
       <DraftAttachments items={attachments} onRetry={retryFile} onRemove={removeFile} />
+      {quote ? (
+        // 引用只属于当前草稿：取消后恢复输入焦点，发送成功后随草稿一起清空。
+        <div className={styles.quote} role="note" aria-label={quoteText(t, 'quoteSource')}>
+          <div className={styles.quoteHeader}>
+            <span className={styles.quoteLabel}>{quoteText(t, 'quoteSource')}</span>
+            <IconButton
+              className={styles.quoteRemove}
+              icon={<IconCloseOutline16 />}
+              tooltip={quoteText(t, 'quoteRemove')}
+              onClick={() => {
+                setDraftQuote(sessionId, null)
+                textareaRef.current?.focus({ preventScroll: true })
+              }}
+            />
+          </div>
+          <div className={styles.quoteText}>{quote.text}</div>
+        </div>
+      ) : null}
       <div className={styles.textareaWrapper}>
         <textarea
           ref={textareaRef}
@@ -186,7 +220,10 @@ const Input = ({ sessionId }: { sessionId: string | null }) => {
           autoFocus={!isMobile}
           disabled={importingHistory}
           value={text}
-          onChange={(event) => setText(event.target.value)}
+          onChange={(event) => {
+            historyIndexRef.current = -1
+            setText(event.target.value)
+          }}
           onMouseDown={(event) => {
             // 首次点击时手动聚焦，避免 Safari 把整个页面滚到输入框位置。
             if (isMobile && event.button === 0 && document.activeElement !== event.currentTarget) {
@@ -195,7 +232,21 @@ const Input = ({ sessionId }: { sessionId: string | null }) => {
             }
           }}
           onKeyDown={(event) => {
-            if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
+            // 输入法确认候选词的 Enter 不能发送：部分浏览器合成的 isComposing 已为 false，
+            // 仍会带 keyCode 229；Shift+Enter 始终保留为换行。
+            if (
+              event.key !== 'Enter' ||
+              event.shiftKey ||
+              event.nativeEvent.isComposing ||
+              event.nativeEvent.keyCode === 229
+            ) {
+              return
+            }
+            const withModifier = event.ctrlKey || event.metaKey
+            if (
+              (sendKey === 'enter' && !withModifier) ||
+              (sendKey === 'ctrlEnter' && withModifier)
+            ) {
               event.preventDefault()
               send()
             }
@@ -248,6 +299,9 @@ const Input = ({ sessionId }: { sessionId: string | null }) => {
           </Tooltip>
         </div>
         <div className={styles.right}>
+          {showInputCount && text.length > 0 ? (
+            <span className={styles.count}>{t('inputCharCount', { count: text.length })}</span>
+          ) : null}
           <VoiceButton
             status={voice.status}
             disabled={!voice.available}

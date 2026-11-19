@@ -1,0 +1,32 @@
+.bar {
+  position: fixed;
+  z-index: 1000;
+  display: flex;
+  padding: 3px;
+  border-radius: var(--ds-radius-10);
+  background-color: var(--dsw-specific-menu);
+  box-shadow:
+    0 0 1px rgba(0, 0, 0, 0.2),
+    0 0 4px rgba(0, 0, 0, 0.02),
+    0 8px 24px rgba(0, 0, 0, 0.12);
+  user-select: none;
+}
+
+.action {
+  padding: 4px 12px;
+  border: none;
+  border-radius: var(--ds-radius-8);
+  background: none;
+  color: var(--dsw-alias-label-primary);
+  font: inherit;
+  font-size: 13px;
+  line-height: 20px;
+  white-space: nowrap;
+  cursor: pointer;
+
+  &:hover,
+  &:focus-visible {
+    background-color: var(--dsw-alias-interactive-bg-hover);
+    outline: none;
+  }
+}

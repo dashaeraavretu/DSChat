@@ -23,6 +23,10 @@ export const exportHistory = (): Promise<{ name: string; blob: Blob }> =>
     const { sessions, sessionCache } = useChatStore.getState()
     async function* readSessions(): AsyncGenerator<Session> {
       for (const summary of sessions) {
+        // 临时会话不写历史，也不进入用户主动导出的归档
+        if (summary.ephemeral) {
+          continue
+        }
         const session = Object.hasOwn(sessionCache, summary.id)
           ? sessionCache[summary.id]
           : await db.loadSession(summary.id)
