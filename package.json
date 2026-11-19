@@ -26,9 +26,9 @@
     "test:proxy": "cross-env DSCHAT_PROXY_ALLOW_LOOPBACK=1 electron . --smoke-proxy",
     "test:update": "electron . --smoke-update",
     "icon": "node scripts/generate-icon.mjs",
-    "dist:win": "pnpm build:web && electron-builder --win --config.win.artifactName=DSChat-0.4.0-x64.exe",
-    "dist:test": "rimraf release-test && pnpm build:test && electron-builder --win --config.directories.output=release-test --config.win.artifactName=DSChat-0.4.0-qianji-test-x64.exe",
-    "dist:dir": "pnpm build:web && electron-builder --win --dir",
+    "dist:win": "pnpm build:web && electron-builder --win --publish never --config.win.artifactName=DSChat-0.4.0-x64.exe",
+    "dist:test": "rimraf release-test && pnpm build:test && electron-builder --win --publish never --config.directories.output=release-test --config.win.artifactName=DSChat-0.4.0-qianji-test-x64.exe",
+    "dist:dir": "pnpm build:web && electron-builder --win --publish never --dir",
     "type": "tsc -p tsconfig.json",
     "lint": "oxlint src rspack.config.ts",
     "format": "oxfmt --write ."
