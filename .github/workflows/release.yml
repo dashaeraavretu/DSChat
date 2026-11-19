@@ -64,10 +64,13 @@ jobs:
         env:
           DSCHAT_GITHUB_REPO: ${{ github.repository }}
 
+      - name: Package web build
+        run: node scripts/package-web.mjs
+
       - name: Write checksums
         shell: pwsh
         run: |
-          Get-FileHash "release/DSChat-*.exe" -Algorithm SHA256 | ForEach-Object {
+          Get-FileHash "release/DSChat-*.exe", "release/DSChat-*-web.zip" -Algorithm SHA256 | ForEach-Object {
             "{0}  {1}" -f $_.Hash.ToLower(), (Split-Path $_.Path -Leaf)
           } | Set-Content release/SHA256SUMS.txt
           Get-Content release/SHA256SUMS.txt
@@ -86,4 +89,6 @@ jobs:
           if ($LASTEXITCODE -ne 0) {
             gh release create $tag --title "DSChat $tag" --generate-notes
           }
-          gh release upload $tag "release/DSChat-*.exe" "release/DSChat-*.exe.blockmap" "release/SHA256SUMS.txt" --clobber
+          $files = @(Get-ChildItem "release/DSChat-*.exe", "release/DSChat-*.exe.blockmap", "release/DSChat-*-web.zip" | ForEach-Object { $_.FullName })
+          $files += (Resolve-Path "release/SHA256SUMS.txt").Path
+          gh release upload $tag $files --clobber

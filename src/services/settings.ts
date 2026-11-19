@@ -38,6 +38,8 @@ type Settings = {
   apiKey: string | null
   /** 主进程是否持有 API Key（桌面端唯一的 Key 状态来源） */
   hasApiKey: boolean
+  /** 网页版是否把 API Key 写入浏览器存储；关闭后仅本次页面内存有效 */
+  rememberWebApiKey: boolean
   apiKeyStorage: ApiKeyStorage
   locale: Locale
   themePreference: ThemePreference
@@ -66,6 +68,7 @@ type Settings = {
 
 const KEYS = {
   apiKey: 'chat-demo:api-key',
+  rememberWebApiKey: 'chat-demo:remember-web-api-key',
   locale: 'chat-demo:locale',
   location: 'chat-demo:location',
   themePreference: 'chat-demo:theme-preference',
@@ -178,6 +181,9 @@ const initialApiKey = (): string | null => {
   if (isElectronRuntime()) {
     return null
   }
+  if (read(KEYS.rememberWebApiKey) === 'false') {
+    return null
+  }
   return read(KEYS.apiKey)
 }
 
@@ -199,7 +205,11 @@ export const useSettings = create<Settings>(() => ({
   apiKey: initialApiKey(),
   hasApiKey:
     desktopBridge()?.hasApiKey === true ||
-    (!desktopBridge() && !isElectronRuntime() && !!read(KEYS.apiKey)),
+    (!desktopBridge() &&
+      !isElectronRuntime() &&
+      read(KEYS.rememberWebApiKey) !== 'false' &&
+      !!read(KEYS.apiKey)),
+  rememberWebApiKey: read(KEYS.rememberWebApiKey) !== 'false',
   apiKeyStorage: initialApiKeyStorage(),
   locale: initialLocale(),
   location: initialLocation(),
@@ -250,8 +260,7 @@ export const setTtsVoice = (ttsVoice: TtsVoice) => {
   useSettings.setState({ ttsVoice })
 }
 
-const setApiKeyStorage = (apiKeyStorage: ApiKeyStorage) =>
-  useSettings.setState({ apiKeyStorage })
+const setApiKeyStorage = (apiKeyStorage: ApiKeyStorage) => useSettings.setState({ apiKeyStorage })
 
 /** 重新向主进程查询实际存储方式；桌面端只接受 encrypted / memory */
 export const refreshApiKeyStorage = async (): Promise<void> => {
@@ -309,10 +318,7 @@ const saveDesktopApiKey = async (
  * DESKTOP_KEY_PRESENT 标记；网页端保持原有 localStorage 行为。
  * `persisted` 用于「主进程已校验并保存」的场景，避免重复写盘。
  */
-export const setApiKey = (
-  apiKey: string | null,
-  options?: { persisted?: boolean }
-) => {
+export const setApiKey = (apiKey: string | null, options?: { persisted?: boolean }) => {
   const bridge = desktopBridge()
   if (!bridge) {
     if (isElectronRuntime()) {
@@ -322,7 +328,7 @@ export const setApiKey = (
       useSettings.setState({ apiKey: null, hasApiKey: false })
       return
     }
-    write(KEYS.apiKey, apiKey)
+    write(KEYS.apiKey, useSettings.getState().rememberWebApiKey ? apiKey : null)
     useSettings.setState({
       apiKey,
       hasApiKey: !!apiKey,
@@ -341,6 +347,25 @@ export const setApiKey = (
     return
   }
   void saveDesktopApiKey(bridge, apiKey, previousHasKey)
+}
+
+/**
+ * 网页版：控制是否把 API Key 写入浏览器存储。
+ * 关闭时立即删除已落盘的明文 Key；内存中的 Key 保留到本次会话结束。
+ */
+export const setRememberWebApiKey = (rememberWebApiKey: boolean) => {
+  write(KEYS.rememberWebApiKey, String(rememberWebApiKey))
+  if (!desktopBridge()) {
+    if (rememberWebApiKey) {
+      const current = useSettings.getState().apiKey
+      if (current) {
+        write(KEYS.apiKey, current)
+      }
+    } else {
+      write(KEYS.apiKey, null)
+    }
+  }
+  useSettings.setState({ rememberWebApiKey })
 }
 
 /**
@@ -479,11 +504,7 @@ export const applyProxyPreference = (): void => {
   })
 }
 
-export const setProxyPreference = (patch: {
-  mode?: ProxyMode
-  host?: string
-  port?: string
-}) => {
+export const setProxyPreference = (patch: { mode?: ProxyMode; host?: string; port?: string }) => {
   const next = {
     proxyMode: patch.mode ?? useSettings.getState().proxyMode,
     proxyHost: patch.host ?? useSettings.getState().proxyHost,

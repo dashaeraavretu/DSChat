@@ -3,6 +3,25 @@
 All notable changes to DSChat are recorded here. Versions follow `package.json`
 and release tags use the `vX.Y.Z` form.
 
+## 0.5.0 — 2026-11-19
+
+### Added
+
+- User-facing Chinese README as the default, with an English `README.en.md`.
+- Web/PWA deployment: service worker with versioned offline shell, installable
+  manifest, iOS safe-area handling, and a Cloudflare Pages guide/workflow.
+- Generated `dist/_headers` with a strict CSP that follows the build-time API
+  origin; generated `dist/sw.js`.
+- `wrangler.toml`, `pnpm deploy:cf`, and a manual Cloudflare Pages deploy
+  workflow.
+- Web setting: **Remember API key in this browser**. When off, the key stays in
+  memory for the current page only and is removed from `localStorage`.
+
+### Changed
+
+- Web API key hint now explains the session-only option.
+- README screenshots and deployment documentation.
+
 ## 0.4.0 — 2026-11-19
 
 ### Added

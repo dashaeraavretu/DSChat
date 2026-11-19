@@ -9,6 +9,7 @@ import {
 import {
   createPreset,
   deletePreset,
+  parsePresetBundle,
   setDefaultPreset,
   updatePreset,
   usePresets,
@@ -41,6 +42,7 @@ export const PresetsSection = () => {
   const [draft, setDraft] = useState<Draft | null>(null)
   const [deleting, setDeleting] = useState<Preset | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
+  const bundleFileRef = useRef<HTMLInputElement>(null)
 
   const openNew = () => setDraft({ name: '', system: '', greeting: '' })
   const openEdit = (preset: Preset) =>
@@ -99,6 +101,79 @@ export const PresetsSection = () => {
     }
   }
 
+  const downloadJson = async (name: string, content: string): Promise<boolean> => {
+    const bridge = window.desktop
+    if (bridge?.saveTextFile) {
+      return bridge.saveTextFile({ content, defaultName: name })
+    }
+    const blob = new Blob([content], { type: 'application/json;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = name
+    anchor.rel = 'noopener'
+    document.body.appendChild(anchor)
+    anchor.click()
+    anchor.remove()
+    setTimeout(() => URL.revokeObjectURL(url), 1000)
+    return true
+  }
+
+  const exportPresets = async () => {
+    if (presets.length === 0) {
+      return
+    }
+    const bundle = {
+      format: 'dschat-presets',
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      presets,
+    }
+    const date = new Date().toISOString().slice(0, 10)
+    try {
+      const ok = await downloadJson(
+        `dschat-presets-${date}.json`,
+        `${JSON.stringify(bundle, null, 2)}\n`
+      )
+      showToast(ok ? { key: 'presetBundleExported' } : { key: 'presetExportFailed', type: 'error' })
+    } catch {
+      showToast({ key: 'presetExportFailed', type: 'error' })
+    }
+  }
+
+  const importBundle = async (file: File) => {
+    if (file.size > 5 * 1024 * 1024) {
+      showToast({ key: 'presetBundleTooLarge', type: 'error' })
+      return
+    }
+    try {
+      const parsed = JSON.parse(await file.text()) as unknown
+      const items = parsePresetBundle(parsed)
+      if (!items) {
+        showToast({ key: 'presetBundleInvalid', type: 'error' })
+        return
+      }
+      const existing = new Set(presets.map((preset) => `${preset.name}\u0000${preset.system}`))
+      let count = 0
+      for (const item of items) {
+        const key = `${item.name}\u0000${item.system}`
+        if (existing.has(key)) {
+          continue
+        }
+        existing.add(key)
+        createPreset({ ...item, source: 'manual' })
+        count += 1
+      }
+      if (count === 0) {
+        showToast({ key: 'presetBundleEmpty', type: 'error' })
+        return
+      }
+      showToast({ key: 'presetBundleImported', params: { count } })
+    } catch {
+      showToast({ key: 'presetBundleInvalid', type: 'error' })
+    }
+  }
+
   return (
     <div className={styles.presets}>
       <div className={styles.presetToolbar}>
@@ -107,6 +182,17 @@ export const PresetsSection = () => {
         </Button>
         <Button variant="outlined" size="m" onClick={() => fileRef.current?.click()}>
           {t('presetImport')}
+        </Button>
+        <Button variant="outlined" size="m" onClick={() => bundleFileRef.current?.click()}>
+          {t('presetImportBundle')}
+        </Button>
+        <Button
+          variant="outlined"
+          size="m"
+          disabled={presets.length === 0}
+          onClick={() => void exportPresets()}
+        >
+          {t('presetExport')}
         </Button>
         <input
           ref={fileRef}
@@ -118,6 +204,19 @@ export const PresetsSection = () => {
             event.target.value = ''
             if (file) {
               void importFile(file)
+            }
+          }}
+        />
+        <input
+          ref={bundleFileRef}
+          type="file"
+          accept=".json,application/json"
+          hidden
+          onChange={(event) => {
+            const file = event.target.files?.[0]
+            event.target.value = ''
+            if (file) {
+              void importBundle(file)
             }
           }}
         />
@@ -139,22 +238,14 @@ export const PresetsSection = () => {
             </div>
             <div className={styles.presetActions}>
               {preset.id !== defaultId ? (
-                <Button
-                  variant="outlined"
-                  size="s"
-                  onClick={() => setDefaultPreset(preset.id)}
-                >
+                <Button variant="outlined" size="s" onClick={() => setDefaultPreset(preset.id)}>
                   {t('presetSetDefault')}
                 </Button>
               ) : null}
               <Button variant="outlined" size="s" onClick={() => openEdit(preset)}>
                 {t('presetEdit')}
               </Button>
-              <Button
-                variant="dangerOutlined"
-                size="s"
-                onClick={() => setDeleting(preset)}
-              >
+              <Button variant="dangerOutlined" size="s" onClick={() => setDeleting(preset)}>
                 {t('presetDelete')}
               </Button>
             </div>
@@ -234,10 +325,12 @@ export const PresetsSection = () => {
             <div className={styles.presetPreview}>
               <div className={styles.presetFieldLabel}>{t('presetPreview')}</div>
               {draft.system.trim() ? (
-                <pre>{renderPrompt(draft.system, {
-                  char: draft.name || 'Assistant',
-                  original: ORIGINAL_SYSTEM_PROMPT,
-                })}</pre>
+                <pre>
+                  {renderPrompt(draft.system, {
+                    char: draft.name || 'Assistant',
+                    original: ORIGINAL_SYSTEM_PROMPT,
+                  })}
+                </pre>
               ) : null}
               {draft.greeting.trim() ? (
                 <pre>{renderPrompt(draft.greeting, { char: draft.name || 'Assistant' })}</pre>

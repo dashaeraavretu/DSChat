@@ -13,6 +13,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const tests = [
   'provider-config.test.mjs',
   'update-check.test.mjs',
+  'web-deploy.test.mjs',
   'security-csp.test.mjs',
   'security-key.test.mjs',
   'presets.test.mjs',

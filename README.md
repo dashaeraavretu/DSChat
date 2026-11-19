@@ -1,191 +1,163 @@
+<div align="center">
+
 # DSChat
 
-English | [简体中文](README.zh-CN.md)
+**面向 DeepSeek API 的桌面与 Web 聊天客户端。自己的 Key，自己的数据。**
 
-DSChat is a Windows desktop chat client for the DeepSeek API, built as an Electron wrapper around the official [deepseek-ai/chat-demo](https://github.com/deepseek-ai/chat-demo) web demo. The v1 goal is feature parity with the demo: the same conversations, streaming replies, search, attachments, speech, rendering, themes, and history tools, packaged as a native desktop app.
+[下载 Windows 版](https://github.com/dashaeraavretu/DSChat/releases/latest) · [Web 部署](docs/WEB-DEPLOY.md) · [功能](#功能) · [常见问题](#常见问题)
 
-There is no application backend. Each user brings their own DeepSeek API key and the app talks directly to the configured API service. The key is encrypted with the operating system's credential protection (Electron `safeStorage`) and stored locally in the app's `userData` directory; it is never bundled, logged, exported, or sent anywhere except the API service you configure.
+[![Release](https://img.shields.io/github/v/release/dashaeraavretu/DSChat?style=flat-square)](https://github.com/dashaeraavretu/DSChat/releases/latest)
+[![License](https://img.shields.io/github/license/dashaeraavretu/DSChat?style=flat-square)](LICENSE)
 
-## Requirements
+![DSChat 欢迎页](docs/screenshots/welcome.png)
 
-- Windows 10/11 (x64)
-- Node.js 22.12 or newer
-- pnpm
+</div>
 
-## Build and run
+DSChat 是一个开源、本地优先的 DeepSeek 客户端。桌面版用 Electron 封装为 Windows 应用；Web 版是纯静态站点，可以自己部署到 Cloudflare Pages 等平台。界面沿用 DeepSeek 官方 `chat-demo`，并补上了日常使用需要的提示词预设、角色卡导入、引用回复、导出图片、临时会话等功能。
+
+**不需要账号，没有官方后端，没有遥测。** 每位使用者填写自己的 DeepSeek API Key，会话和附件保存在本机。
+
+## 下载与安装
+
+1. 打开 [Releases](https://github.com/dashaeraavretu/DSChat/releases/latest)。
+2. 下载 `DSChat-x.y.z-x64.exe`。
+3. 运行安装包，启动后在设置里填入自己的 API Key。
+
+安装包目前**未做代码签名**，Windows 可能提示“未知发布者”；这是预期行为。请从 Releases 页面下载，并用同页的 `SHA256SUMS.txt` 核对文件：
+
+```powershell
+Get-FileHash .\DSChat-x.y.z-x64.exe -Algorithm SHA256
+```
+
+API Key 可在 [DeepSeek 开放平台](https://platform.deepseek.com/) 创建，用量计入你自己的账户。
+
+Releases 同时提供 `DSChat-x.y.z-web.zip`：解压后把内容上传到 Cloudflare Pages 或任意静态托管即可使用 Web 版，无需自己构建。
+
+## Web 版部署（Cloudflare Pages）
+
+Web 版是纯静态资源，不需要服务器。最省事的方式是让 Cloudflare 直接从 Git 构建：
+
+1. Fork 本仓库。
+2. 打开 Cloudflare Dashboard → **Workers & Pages** → **Create** → **Pages** → **Connect to Git**，选择你的仓库。
+3. 构建命令填 `pnpm build`，输出目录填 `dist`；Node 版本选 24，pnpm 版本填 `12.6.0`。
+4. 保存并部署。
+
+也可以本地构建后用 Wrangler 上传：
 
 ```sh
-git clone <this-repository>
-cd <repository>
 pnpm install
+pnpm build
+pnpm dlx wrangler pages deploy dist --project-name dschat
 ```
 
-Web version (same UI as the official demo):
+使用自建网关时，在构建阶段设置 API 地址：
 
 ```sh
-pnpm dev       # development server at http://localhost:8090
-pnpm build     # static site in dist/
-```
-
-Desktop version:
-
-```sh
-pnpm dev:desktop  # Electron shell with the development server
-pnpm start        # build and launch the desktop app
-pnpm smoke        # launch the built app and exit after page load
-pnpm dist:dir     # unpacked desktop app for local testing
-pnpm dist:win     # Windows installer / distributable
-pnpm dist:test    # qianji test build in release-test/ (not for distribution)
-```
-
-`pnpm build` produces the web assets in `dist/`. Packaging commands use electron-builder and write installers to `release/` as configured by `build.directories.output` in [package.json](package.json).
-
-See [docs/SELF-HOST.md](docs/SELF-HOST.md) for a complete self-hosting and redistribution guide, including custom API origins, Windows script notes, microphone permissions, proxies, and `file://` limitations.
-
-## Using DSChat
-
-1. Launch the desktop app.
-2. Open Settings and enter your DeepSeek API key. The app verifies it before saving.
-3. Chat as in the official demo. The key can be replaced at any time in Settings.
-
-Get an API key from the [DeepSeek platform](https://platform.deepseek.com/). Usage is billed to your own account.
-
-## Features
-
-DSChat v1 aims to reproduce the official demo's feature set on the desktop:
-
-- Multiple conversations with automatic titles, renaming, and deletion; edit prompts, regenerate replies, and switch between message branches.
-- Streaming replies, deep thinking, smart search, link reading, and source citations; stop generation or continue eligible replies.
-- Upload, paste, or drag and drop attachments; voice input and read replies aloud. A live audio spectrum appears in the first row of the input area while recording on mobile layouts.
-- Markdown, syntax highlighting, KaTeX math, and Mermaid diagrams.
-- Simplified Chinese and English, light and dark themes (including follow-system), mobile layouts, location settings, and chat history import and export.
-
-Unreleased (0.4.0):
-
-- About dialog: check the latest GitHub Release and open its download page; no automatic download or installation.
-- GitHub Actions release workflow for tagged Windows builds, with SHA256 checksums and release assets.
-- The Windows installer is unsigned; SmartScreen warnings are expected.
-
-Added in 0.3.3:
-
-- Strict Content-Security-Policy on `dsc://app`; no inline scripts and no direct renderer connections to the API.
-- All Messages, Files, ASR, TTS and model-verification requests now go through a main-process proxy.
-- The API key stays in the main process (`safeStorage` or memory-only); the renderer only sees `hasApiKey`.
-- Removed the plaintext `secrets.json` fallback and the `localStorage` key fallback.
-
-Added in 0.3.2:
-
-- Quote selected message text when replying.
-- Export a conversation branch as an image with KaTeX/Mermaid rendered correctly.
-- Optional completion sound.
-- HTTP / SOCKS5 proxy settings (system / manual).
-
-Added in 0.3.1:
-
-- Prompt variables (`{{user}}`, `{{char}}`, `{{date}}`, `{{time}}`, `{{original}}`).
-- Open-source decorations for empty/error/loading states with third-party notices.
-- Per-session input history (↑/↓) and an optional character counter.
-
-Added in 0.3.0:
-
-- Prompt presets in a third Settings tab: create/edit, default marker, per-session snapshot and per-turn system injection; empty chats show the preset greeting.
-- Import Tavern character cards V2/V3 from `.json` or `.png` (tEXt/iTXt `chara` / `ccv3`) into a preset; no world books, group chat or STscript.
-- Temporary chats (memory only), session pinning, comfortable/wide reading width, TTS speed 0.8/1.0/1.2, and Enter / Ctrl+Enter send preference.
-- Copy button on hover for display math blocks; CJK bold Markdown regression coverage.
-
-Added in 0.2.1:
-
-- Export a single conversation branch as Markdown from the session menu.
-- Optional completion notification after 15s when the window is unfocused.
-- Interface zoom (90/100/110/125%) persisted across launches.
-- Inline retry for interrupted/network replies and online/offline toasts.
-- Attachment count/size/type precheck before upload, with accurate 32/64 MB limits.
-- Native `Ctrl+K` search, `Ctrl+N` new chat, `Ctrl+,` settings and `Esc` close/stop.
-
-Added in 0.2.0:
-
-- Sidebar chat search across titles and message text, with native `Ctrl+K` / `Ctrl+N` shortcuts (150 ms debounce).
-- Per-reply metadata: timestamp, input/cache/output tokens, and elapsed time (hidden on narrow layouts).
-- Window position/size memory with multi-monitor fallback, tray menu (show/hide, new chat, quit), and optional close-to-tray with a first-close hint.
-- About panel showing version, API endpoint, model, and available features, plus redacted local diagnostics export (OS/Electron versions included).
-
-A per-feature checklist with expected desktop behavior, verification steps, and known server-side dependencies is in [docs/FEATURE-PARITY.md](docs/FEATURE-PARITY.md). Manual release checks are in [docs/QA-CHECKLIST.md](docs/QA-CHECKLIST.md).
-
-Some capabilities are implemented by the API service rather than the client: smart search, link reading, speech recognition (ASR), read-aloud (TTS), attachment validation, automatic titles, continuation, and content-safety filtering require a compatible DeepSeek service. The desktop port does not reimplement them locally; it preserves the original request/response protocol. See the API capability matrix in the parity document.
-
-## Data and storage
-
-- **Desktop API key:** held only by the main process and encrypted with Electron `safeStorage` (Windows DPAPI) before being written to `secrets.json` in the Electron `userData` directory. If system encryption is unavailable, the key is kept in main-process memory only for that run and the settings screen shows an unencrypted/degraded status; it is never written as plaintext and never falls back to `localStorage`. The renderer only sees a boolean `hasApiKey`; every authenticated request is sent by the main process. Settings also provides a confirmed **Clear API Key** action.
-- **Web API key and settings:** stored in browser `localStorage` (`chat-demo:api-key` and related keys). Use the web build only on a trusted profile.
-- **Conversations and attachment originals:** stored locally in IndexedDB.
-- **History import/export:** ZIP archives containing conversations and locally available image originals. Exports exclude the API key, settings, and original non-image attachments.
-- **Delete all chats:** clears local conversations, attachment originals, and unsent drafts; the API key and settings are preserved.
-- **Network:** messages, attachments, and speech audio are sent to the configured API service. Uploaded files remain subject to that service's retention policy.
-
-See [src/services/chat/history/README.md](src/services/chat/history/README.md) for the archive format.
-
-## Custom API origin
-
-The API origin is fixed at build time. By default it is `https://api.deepseek.com`; set `DSCHAT_API_ORIGIN` when building to target a compatible gateway or self-hosted endpoint:
-
-```sh
-# Git Bash / macOS / Linux
 DSCHAT_API_ORIGIN=https://api.example.com pnpm build
-
-# PowerShell
-$env:DSCHAT_API_ORIGIN = "https://api.example.com"; pnpm build
 ```
 
-The build writes the resolved provider (origin, endpoint paths, model, feature flags) to `electron/provider-config.json`. The main process reads this file as both its default provider and its proxy allowlist, so a packaged self-hosted build keeps working without any runtime environment variable. The renderer never requests the API directly, so server-side CORS configuration is not required for the desktop build.
+详细步骤、自定义域名、CORS、安全响应头与 PWA 说明见 **[docs/WEB-DEPLOY.md](docs/WEB-DEPLOY.md)**。
 
-The endpoint must implement the Anthropic-compatible Messages / Files API and the extensions used by the demo (search, link reading, titles, `latest_reminder`, ASR/TTS). See [docs/SELF-HOST.md](docs/SELF-HOST.md) for details and security considerations.
+> 网页版只能把 API Key 保存在浏览器 `localStorage`，是明文本地存储。请只在可信设备和浏览器配置中使用；公共电脑建议用「仅本次会话」模式（设置 → 数据管理）。
 
-## Updates and releases
+## 功能
 
-DSChat does **not** auto-update. The About dialog has a **Check for updates** action that queries the public GitHub Releases API for the repository baked in at build time (`DSCHAT_GITHUB_REPO` or `package.json.repository`) and, when a newer version exists, opens its download page in the system browser. The request is sent by the main process; it contains no API key or chat data. Private repositories are not supported by the unauthenticated update checker.
+### 对话
 
-Tagged builds (`vX.Y.Z`) are produced by `.github/workflows/release.yml` and published to GitHub Releases with `SHA256SUMS.txt`. The installer is not code-signed, so Windows may show a SmartScreen warning; verify the SHA256 checksum before running.
+- 多会话、自动标题、重命名、删除；会话搜索、置顶、临时会话。
+- 流式回答、深度思考、停止生成、继续生成；编辑提问、重新生成、消息分支切换。
+- 智能搜索、链接阅读、来源引用（由 DeepSeek API 提供）。
+- 每条回复显示时间、Token 用量与耗时。
 
-## Development
+### 输入与附件
 
-| Command           | Description                                   |
-| ----------------- | --------------------------------------------- |
-| `pnpm dev`        | Start the web development server on port 8090 |
-| `pnpm dev:desktop`| Run the Electron shell with the dev server    |
-| `pnpm build`      | Build the web assets into `dist/`             |
-| `pnpm start`      | Build and launch the desktop app              |
-| `pnpm smoke`      | Launch the built app and exit after page load |
-| `pnpm dist:dir`   | Package an unpacked desktop app in `release/` |
-| `pnpm dist:win`   | Package the Windows installer in `release/`   |
-| `pnpm dist:test`  | Build the qianji test installer in `release-test/` |
-| `pnpm type`       | Run TypeScript type checks                    |
-| `pnpm lint`       | Lint with oxlint                              |
-| `pnpm test`       | Run all headless regression tests             |
-| `pnpm test:proxy` | Exercise the main-process API proxy against a local mock |
-| `pnpm test:update` | Exercise the update checker against a mock Releases API |
-| `pnpm format`     | Format with oxfmt                             |
-| `node tests/smoke.mjs` | Zero-dependency post-build smoke test    |
+- 文本、图片、PDF、Office 附件；拖拽、粘贴、上传前数量/大小/类型预检。
+- 语音输入与回复朗读；朗读语速可调。
+- 引用选中文本回复；会话级输入历史（↑/↓）；可选字数统计。
+- Enter / Ctrl+Enter 发送偏好；`Ctrl+K` 搜索、`Ctrl+N` 新建、`Ctrl+,` 设置、`Esc` 关闭/停止。
 
-The source layout follows the upstream demo:
+### 提示词与角色
 
-```text
-src/
-  app/                 Application layout, themes, and global styles
-  components/          Chat, settings, Markdown, and other UI components
-  i18n/                English and Chinese translations
-  services/
-    api/               API requests, SSE, and protocol types
-    chat/              Conversations, message branches, storage, and history import/export
-    markdown/          Markdown parsing, syntax highlighting, and diagrams
-    speech/            Audio recording and read-aloud playback
-  utils/               Shared utilities
-electron/              Main process, preload bridge, and desktop integration
-tests/                 Smoke tests
-docs/                  Parity, self-hosting, and QA documentation
-```
+- 设置内置「预设」：新建、编辑、默认标记；每轮注入 system 提示，空会话显示开场白。
+- 导入酒馆角色卡 V2/V3（`.json` / `.png`）为预设。
+- 预设变量：`{{user}}`、`{{char}}`、`{{date}}`、`{{time}}`、`{{original}}`。
+- 会话创建时固化预设快照，之后修改预设不会影响已有会话。
 
-## Upstream and license
+![提示词预设](docs/screenshots/presets.png)
 
-This project is a derivative of [deepseek-ai/chat-demo](https://github.com/deepseek-ai/chat-demo), Copyright (c) 2026 DeepSeek, licensed under the [MIT License](LICENSE). The upstream attribution and license notice are retained. Builds copy the license to `dist/LICENSE`; include it when redistributing. Third-party dependencies remain subject to their own licenses.
+### 阅读与导出
 
-DSChat is an independent community desktop wrapper and is not an official DeepSeek product. Do not use DeepSeek names or marks in a way that suggests endorsement.
+- Markdown、代码高亮、KaTeX 公式、Mermaid 图表。
+- 行间公式悬停复制；舒适/宽阅读宽度。
+- 单会话导出 Markdown；会话/消息导出为图片；全量历史 ZIP 导入导出。
+- 三套可选外观（原版 / TUI / 胖鱼 / 纸张），浅色、深色、跟随系统；中英文界面。
+
+### 桌面与 Web
+
+- 桌面版：窗口位置记忆、托盘、关闭到托盘、完成通知、界面缩放、HTTP/SOCKS5 代理、诊断日志导出。
+- 关于页「检查更新」：查询 GitHub Releases，有更新时打开下载页，不自动安装。
+- Web 版：可安装为 PWA，支持应用外壳离线缓存；可部署到 Cloudflare Pages。
+
+## 隐私与数据
+
+- **桌面版 API Key**：只由主进程持有，经 Windows DPAPI（Electron `safeStorage`）加密后保存；系统加密不可用时只保留在本次运行的内存中，重启需重新输入。不会写明文文件，也不会回退到 `localStorage`。
+- **Web 版 API Key**：保存在浏览器 `localStorage`（明文）。可用「仅本次会话」模式避免落盘。
+- **会话与附件**：保存在本机 IndexedDB / 本地文件；没有云端账号，也不会自动上传到本项目控制的服务器。
+- **网络**：消息、附件与语音只发送到你配置的 API 服务。网页版和桌面版都不包含遥测或崩溃上报。
+- **导出**：历史 ZIP 不包含 API Key；诊断日志会脱敏 Key 与敏感请求头。
+
+## 常见问题
+
+### 应该用哪个 API Key？
+
+默认发布只连接官方 `https://api.deepseek.com`，在 [DeepSeek 开放平台](https://platform.deepseek.com/) 创建 Key 即可。千机等兼容网关只用于内部测试构建，不进入默认发布。
+
+### Windows 提示“未知发布者”怎么办？
+
+当前没有购买代码签名证书，安装包未签名。请核对 Releases 页面的 SHA256；如果你不能接受 SmartScreen 警告，可以自行从源码构建。
+
+### 「检查更新」会自动升级吗？
+
+不会。它只查询公开 GitHub Releases，有更新时在系统浏览器打开下载页。安装仍由你手动完成。
+
+### Web 版能离线用吗？
+
+首次加载后，PWA 会缓存应用外壳和静态资源；离线时可以打开界面和查看本地会话，但发送消息仍需要网络和 API 服务。
+
+### 自建网关需要配置 CORS 吗？
+
+Web 版从浏览器直接请求 API，服务端需要允许你的站点源。桌面版所有请求由主进程代理发出，不需要 CORS。细节见 [docs/WEB-DEPLOY.md](docs/WEB-DEPLOY.md) 和 [docs/SELF-HOST.md](docs/SELF-HOST.md)。
+
+### 更新检查支持私有仓库吗？
+
+不支持。更新检查使用公开的 GitHub Releases API，不需要 Token；私有仓库需要额外鉴权，当前未实现。
+
+## 开发
+
+环境：Node.js 22.12+、pnpm。
+
+| 命令 | 说明 |
+| --- | --- |
+| `pnpm dev` | 启动网页开发服务器（8090） |
+| `pnpm dev:desktop` | Electron + 开发服务器 |
+| `pnpm build` | 构建 Web 静态产物到 `dist/` |
+| `pnpm dist:win` | 构建 Windows 安装包 |
+| `pnpm dist:test` | 构建千机测试包（不对外分发） |
+| `pnpm type` / `pnpm lint` | 类型检查 / Lint |
+| `pnpm test` | 无头回归测试 |
+| `pnpm test:proxy` | 主进程 API 代理冒烟 |
+| `pnpm test:update` | 更新检查冒烟 |
+
+更多文档：
+
+- [Web 部署与 Cloudflare Pages](docs/WEB-DEPLOY.md)
+- [自部署、自定义 API 与安全说明](docs/SELF-HOST.md)
+- [功能对齐清单](docs/FEATURE-PARITY.md)
+- [手动验收清单](docs/QA-CHECKLIST.md)
+- [更新日志](CHANGELOG.md)
+
+## 许可证与致谢
+
+DSChat 派生自 [deepseek-ai/chat-demo](https://github.com/deepseek-ai/chat-demo)，Copyright (c) 2026 DeepSeek，遵循 [MIT 许可证](LICENSE)。上游署名与许可证声明均已保留；构建会把许可证复制到 `dist/LICENSE`。
+
+第三方依赖遵循各自许可证，详见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。DSChat 是独立的社区项目，并非 DeepSeek 官方产品；请勿以暗示官方背书的方式使用 DeepSeek 名称或标识。

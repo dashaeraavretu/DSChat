@@ -1,6 +1,10 @@
 {
   "name": "DSChat",
   "short_name": "DSChat",
+  "description": "本地优先的 DeepSeek 桌面与 Web 聊天客户端",
+  "lang": "zh-CN",
+  "id": "./",
+  "scope": "./",
   "start_url": "./",
   "display": "standalone",
   "background_color": "#ffffff",

@@ -147,4 +147,17 @@ check('bridge type has hasApiKey but no apiKey field', () => {
   assert.doesNotMatch(env, /\n\s*apiKey:\s*string \| null/)
 })
 
+check('web key persistence can be disabled per browser', () => {
+  assert.match(settings, /rememberWebApiKey/)
+  assert.match(settings, /setRememberWebApiKey/)
+  assert.match(settings, /read\(KEYS\.rememberWebApiKey\) === 'false'/)
+  assert.match(
+    settings,
+    /write\(KEYS\.apiKey, useSettings\.getState\(\)\.rememberWebApiKey \? apiKey : null\)/
+  )
+  const dialog = read('src/components/settings/SettingsDialog.tsx')
+  assert.match(dialog, /WebKeyPersistenceSetting/)
+  assert.match(dialog, /setRememberWebApiKey/)
+})
+
 console.log(`\n${checks} checks passed`)
