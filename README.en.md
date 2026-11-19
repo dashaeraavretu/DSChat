@@ -4,6 +4,8 @@
 
 **A desktop and web chat client for the DeepSeek API. Your key, your data.**
 
+[简体中文](README.md) | English
+
 [Download for Windows](https://github.com/dashaeraavretu/DSChat/releases/latest) · [Self-hosting](#self-hosting) · [Appearance](#appearance) · [Features](#features) · [FAQ](#faq)
 
 [![Release](https://img.shields.io/github/v/release/dashaeraavretu/DSChat?style=flat-square)](https://github.com/dashaeraavretu/DSChat/releases/latest)
