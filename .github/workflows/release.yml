@@ -70,9 +70,11 @@ jobs:
       - name: Write checksums
         shell: pwsh
         run: |
-          Get-FileHash "release/DSChat-*.exe", "release/DSChat-*-web.zip" -Algorithm SHA256 | ForEach-Object {
+          $lines = Get-FileHash "release/DSChat-*.exe", "release/DSChat-*-web.zip" -Algorithm SHA256 | ForEach-Object {
             "{0}  {1}" -f $_.Hash.ToLower(), (Split-Path $_.Path -Leaf)
-          } | Set-Content release/SHA256SUMS.txt
+          }
+          # 明确写 LF，方便 Linux/macOS 用户直接使用 sha256sum -c
+          [IO.File]::WriteAllText("release/SHA256SUMS.txt", ($lines -join "`n") + "`n")
           Get-Content release/SHA256SUMS.txt
 
       - name: Publish GitHub Release
